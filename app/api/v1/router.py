@@ -8,6 +8,8 @@ from app.modules.devices.api.v1.endpoints import router as devices_router
 from app.modules.documents.api.v1.endpoints import router as documents_router
 from app.modules.documents.api.v1.endpoints import templates_router as document_templates_router
 from app.modules.forms.api.v1.endpoints import router as forms_router
+from app.modules.mobile.api.v1.endpoints import router as mobile_router
+from app.modules.mobile.api.v1.websocket import router as mobile_websocket_router
 from app.modules.operators.api.v1.endpoints import router as operators_router
 from app.modules.organizations.api.v1.endpoints import router as organizations_router
 from app.modules.permissions.api.v1.endpoints import router as permissions_router
@@ -32,3 +34,5 @@ api_v1_router.include_router(devices_router)
 api_v1_router.include_router(reports_router)
 api_v1_router.include_router(dashboards_custom_router)
 api_v1_router.include_router(validation_router)
+api_v1_router.include_router(mobile_router)
+api_v1_router.include_router(mobile_websocket_router)

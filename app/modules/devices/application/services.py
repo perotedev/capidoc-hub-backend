@@ -93,6 +93,43 @@ class DeviceService:
             raise ConflictError(f"A device with uid {request.uid} or number {request.device_number} already exists") from error
         return await self.get_device(created.id)
 
+    async def register_mobile_device(
+        self, uid: str, model: str, os_version: str, app_version: str, project_id: UUID, operator_id: UUID
+    ) -> DeviceResponse:
+        """Self-service upsert used by the Android app on login/launch — unlike
+        `register_device` (web/admin inventory registration, which requires a
+        license number and leaves `assigned_to` unset), this always ties the
+        device straight to the authenticated operator and marks it online."""
+        now = datetime.now(timezone.utc)
+        existing = await self._repository.get_by_uid(uid)
+        if existing is not None:
+            existing.model = model
+            existing.os_version = os_version
+            existing.app_version = app_version
+            existing.project_id = project_id
+            existing.assigned_to = operator_id
+            existing.status = DeviceStatus.ONLINE
+            existing.last_sync = now
+            await self._repository.update(existing)
+            return await self.get_device(existing.id)
+
+        device = DeviceEntity(
+            id=uuid.uuid4(),
+            uid=uid,
+            device_number=uid[:50],
+            license_last4="N/A",
+            project_id=project_id,
+            model=model,
+            os_version=os_version,
+            app_version=app_version,
+            last_sync=now,
+            status=DeviceStatus.ONLINE,
+            assigned_to=operator_id,
+            created_at=now,
+        )
+        created = await self._repository.create(device)
+        return await self.get_device(created.id)
+
     async def update_device(self, device_id: UUID, request: DeviceUpdateRequest) -> DeviceResponse:
         summary = await self._get_summary(device_id)
         device = summary.device

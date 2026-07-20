@@ -80,6 +80,11 @@ class SqlAlchemyDeviceRepository:
         model = await self._session.get(DeviceModel, device_id)
         return _device_to_entity(model) if model else None
 
+    async def get_by_uid(self, uid: str) -> DeviceEntity | None:
+        result = await self._session.execute(select(DeviceModel).where(DeviceModel.uid == uid))
+        model = result.scalar_one_or_none()
+        return _device_to_entity(model) if model else None
+
     async def get_summary_by_id(self, device_id: UUID) -> DeviceSummary | None:
         statement = self._summary_statement().where(DeviceModel.id == device_id)
         result = await self._session.execute(statement)
@@ -138,6 +143,7 @@ class SqlAlchemyDeviceRepository:
         model.model = device.model
         model.os_version = device.os_version
         model.app_version = device.app_version
+        model.project_id = device.project_id
         model.last_sync = device.last_sync
         model.status = device.status.value
         model.assigned_to = device.assigned_to

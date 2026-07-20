@@ -6,6 +6,7 @@ from app.shared.schema import CamelCaseModel
 
 class AttendancePhotoResponse(CamelCaseModel):
     id: str
+    field_id: str | None
     caption: str
     url: str
 

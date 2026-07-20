@@ -19,6 +19,7 @@ class AttendanceResponse(CamelCaseModel):
 
 class AttendancePhoto(CamelCaseModel):
     id: str
+    field_id: str | None = None
     caption: str = ""
     file_key: str
 

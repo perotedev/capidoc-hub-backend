@@ -18,6 +18,7 @@ class AttendanceService:
         photos = [
             AttendancePhotoResponse(
                 id=photo.id,
+                field_id=photo.field_id,
                 caption=photo.caption,
                 url=await self._file_url_cache.get_signed_url(photo.file_key),
             )
