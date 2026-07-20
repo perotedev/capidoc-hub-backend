@@ -1,0 +1,37 @@
+# Web framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
+# Settings & validation
+pydantic==2.10.4
+pydantic-settings==2.7.1
+email-validator==2.2.0
+
+# PostgreSQL (async SQLAlchemy 2.0 — asyncpg used for both the app and Alembic migrations)
+sqlalchemy==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+
+# MongoDB (native async driver, PyMongo 4.9+)
+pymongo==4.10.1
+
+# Redis (asyncio client, used for cache + JWT session store)
+redis==5.2.1
+
+# Auth
+pyjwt==2.10.1
+passlib[argon2]==1.7.4
+
+# AWS S3 / MinIO
+boto3==1.35.90
+
+# PDF generation (overlays attendance data onto a form's template PDF —
+# same engine as the capidoc-tauri desktop app, for cross-app compatibility)
+pymupdf==1.24.13
+
+# Transactional email
+resend==2.5.1
+
+# Misc utilities
+python-multipart==0.0.20
+python-dotenv==1.0.1
