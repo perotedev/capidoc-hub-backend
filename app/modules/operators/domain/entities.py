@@ -10,6 +10,7 @@ class OperatorStats:
     total_attendances: int
     avg_duration: int
     completion_rate: int
+    by_day: list[dict]
 
 
 @dataclass(slots=True)

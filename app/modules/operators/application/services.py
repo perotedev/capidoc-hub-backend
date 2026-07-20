@@ -4,6 +4,7 @@ from uuid import UUID
 
 from app.core.cache import FileUrlCacheService
 from app.core.exceptions import NotFoundError
+from app.modules.attendances.domain.entities import AttendanceEntity
 from app.modules.attendances.domain.repositories import AttendanceRepository
 from app.modules.departments.domain.repositories import DepartmentRepository
 from app.modules.forms.domain.entities import FormStatus
@@ -100,6 +101,7 @@ class OperatorService:
         month_count = sum(1 for a in mine if a.created_at >= month_start)
         avg_duration = int(sum(a.duration for a in mine) / len(mine)) if mine else 0
         completion_rate = await self._today_completion_rate(operator_id, project_id, today_start)
+        by_day = self._build_by_day(mine, today_start)
 
         return OperatorStats(
             today_attendances=today_count,
@@ -108,7 +110,24 @@ class OperatorService:
             total_attendances=len(mine),
             avg_duration=avg_duration,
             completion_rate=completion_rate,
+            by_day=by_day,
         )
+
+    @staticmethod
+    def _build_by_day(mine: list[AttendanceEntity], today_start: datetime) -> list[dict]:
+        """Attendance count + total duration (seconds) per day, for the last 7
+        days ending today — feeds the operator detail page's weekly charts."""
+        days = [today_start - timedelta(days=offset) for offset in range(6, -1, -1)]
+        by_day = []
+        for day_start in days:
+            day_end = day_start + timedelta(days=1)
+            day_attendances = [a for a in mine if day_start <= a.created_at < day_end]
+            by_day.append({
+                "date": day_start.date().isoformat(),
+                "count": len(day_attendances),
+                "duration": sum(a.duration for a in day_attendances),
+            })
+        return by_day
 
     async def get_operator(self, operator_id: UUID) -> OperatorReport:
         user = await self._user_service.get_user(operator_id)
