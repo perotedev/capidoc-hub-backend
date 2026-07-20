@@ -85,6 +85,8 @@ class DeviceService:
             last_sync=None,
             status=DeviceStatus.INACTIVE,
             assigned_to=None,
+            require_journey_photo=True,
+            require_journey_gps=True,
             created_at=datetime.now(timezone.utc),
         )
         try:
@@ -125,6 +127,8 @@ class DeviceService:
             last_sync=now,
             status=DeviceStatus.ONLINE,
             assigned_to=operator_id,
+            require_journey_photo=True,
+            require_journey_gps=True,
             created_at=now,
         )
         created = await self._repository.create(device)
@@ -143,6 +147,10 @@ class DeviceService:
             device.status = request.status
         if request.assigned_to is not None:
             device.assigned_to = request.assigned_to
+        if request.require_journey_photo is not None:
+            device.require_journey_photo = request.require_journey_photo
+        if request.require_journey_gps is not None:
+            device.require_journey_gps = request.require_journey_gps
         await self._repository.update(device)
         return await self.get_device(device_id)
 

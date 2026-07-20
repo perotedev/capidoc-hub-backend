@@ -36,6 +36,8 @@ def _device_to_entity(model: DeviceModel) -> DeviceEntity:
         last_sync=model.last_sync,
         status=DeviceStatus(model.status),
         assigned_to=model.assigned_to,
+        require_journey_photo=model.require_journey_photo,
+        require_journey_gps=model.require_journey_gps,
         created_at=model.created_at,
     )
 
@@ -126,6 +128,8 @@ class SqlAlchemyDeviceRepository:
             last_sync=device.last_sync,
             status=device.status.value,
             assigned_to=device.assigned_to,
+            require_journey_photo=device.require_journey_photo,
+            require_journey_gps=device.require_journey_gps,
         )
         self._session.add(model)
         try:
@@ -147,6 +151,8 @@ class SqlAlchemyDeviceRepository:
         model.last_sync = device.last_sync
         model.status = device.status.value
         model.assigned_to = device.assigned_to
+        model.require_journey_photo = device.require_journey_photo
+        model.require_journey_gps = device.require_journey_gps
         await self._session.commit()
         await self._session.refresh(model)
         return _device_to_entity(model)

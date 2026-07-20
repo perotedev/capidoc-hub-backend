@@ -56,6 +56,8 @@ class DeviceEntity:
     last_sync: datetime | None
     status: DeviceStatus
     assigned_to: UUID | None
+    require_journey_photo: bool
+    require_journey_gps: bool
     created_at: datetime
 
 

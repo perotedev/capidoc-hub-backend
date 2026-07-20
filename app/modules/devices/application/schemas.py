@@ -28,6 +28,8 @@ class DeviceUpdateRequest(CamelCaseModel):
     app_version: str | None = None
     status: DeviceStatus | None = None
     assigned_to: UUID | None = None
+    require_journey_photo: bool | None = None
+    require_journey_gps: bool | None = None
 
 
 class DeviceResponse(CamelCaseModel):
@@ -44,6 +46,8 @@ class DeviceResponse(CamelCaseModel):
     status: DeviceStatus
     assigned_to: UUID | None
     assigned_to_name: str | None
+    require_journey_photo: bool
+    require_journey_gps: bool
     created_at: datetime
 
     @classmethod
@@ -62,6 +66,8 @@ class DeviceResponse(CamelCaseModel):
             status=summary.device.status,
             assigned_to=summary.device.assigned_to,
             assigned_to_name=summary.assigned_to_name,
+            require_journey_photo=summary.device.require_journey_photo,
+            require_journey_gps=summary.device.require_journey_gps,
             created_at=summary.device.created_at,
         )
 

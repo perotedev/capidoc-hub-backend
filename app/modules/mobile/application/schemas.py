@@ -40,11 +40,15 @@ class AttendanceSubmitRequest(CamelCaseModel):
 
 class JourneyEventRequest(CamelCaseModel):
     """Payload accompanying the start/end-of-day selfie — the photo itself is
-    a separate multipart file part."""
+    a separate (optional) multipart file part. `device_uid` identifies which
+    device's `requireJourneyPhoto`/`requireJourneyGps` settings apply; whether
+    the photo/coordinates are actually required is enforced server-side, not
+    just left to the app's own UI."""
 
-    latitude: float
-    longitude: float
-    accuracy: float
+    device_uid: str
+    latitude: float | None = None
+    longitude: float | None = None
+    accuracy: float | None = None
 
 
 class LocationPingInput(CamelCaseModel):

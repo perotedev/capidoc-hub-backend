@@ -10,8 +10,10 @@ from app.core.tenancy import CurrentOrgId
 from app.modules.attendances.api.v1.dependencies import AttendanceServiceDep
 from app.modules.attendances.domain.entities import AttendanceEntity, AttendancePhoto, AttendanceResponse
 from app.modules.auth.api.v1.dependencies import CurrentUser, require_roles
-from app.modules.devices.api.v1.dependencies import DeviceServiceDep
+from app.modules.devices.api.v1.dependencies import DeviceServiceDep, get_device_repository
 from app.modules.devices.application.schemas import DeviceResponse
+from app.modules.devices.domain.entities import DeviceEntity
+from app.modules.devices.domain.repositories import DeviceRepository
 from app.modules.forms.api.v1.dependencies import FormServiceDep
 from app.modules.forms.domain.entities import FieldType, FormEntity, FormStatus
 from app.modules.journeys.dependencies import JourneyRepositoryDep, LocationPingRepositoryDep
@@ -155,28 +157,57 @@ def _today_key() -> str:
     return datetime.now(timezone.utc).date().isoformat()
 
 
+async def _get_operator_device(
+    device_uid: str, current_user: CurrentUser, device_repository: DeviceRepository
+) -> DeviceEntity:
+    device = await device_repository.get_by_uid(device_uid)
+    if device is None or device.assigned_to != current_user.id:
+        raise NotFoundError("Device not registered for this operator — call /mobile/devices/register first")
+    return device
+
+
+def _validate_journey_requirements(device: DeviceEntity, data: JourneyEventRequest, photo: UploadFile | None) -> None:
+    """Requirements are configured per device (web admin, Devices screen) and
+    enforced here — the app's own UI adapting to them is a convenience, not
+    the source of truth."""
+    if device.require_journey_photo and photo is None:
+        raise BusinessRuleError("A photo is required to start/end the journey on this device")
+    if device.require_journey_gps and (data.latitude is None or data.longitude is None or data.accuracy is None):
+        raise BusinessRuleError("GPS location is required to start/end the journey on this device")
+
+
 @router.post("/journey/start", status_code=204, dependencies=[require_roles(Role.USER)])
 async def start_journey(
     current_user: CurrentUser,
     journey_repository: JourneyRepositoryDep,
     storage: Annotated[StorageService, Depends(get_storage_service)],
+    device_repository: Annotated[DeviceRepository, Depends(get_device_repository)],
     payload: Annotated[str, Form(...)],
-    photo: UploadFile = File(...),
+    photo: UploadFile | None = File(default=None),
 ) -> None:
     """Start-of-day selfie + GPS — feeds the "start_day" event and photo shown
-    on the operator's day-detail timeline in the web admin."""
+    on the operator's day-detail timeline in the web admin. Whether the photo
+    and/or GPS are actually mandatory depends on the calling device's config."""
     project_id = _require_project_id(current_user)
     data = JourneyEventRequest.model_validate_json(payload)
+    device = await _get_operator_device(data.device_uid, current_user, device_repository)
+    _validate_journey_requirements(device, data, photo)
+
     date = _today_key()
     operator_id = str(current_user.id)
+    now = datetime.now(timezone.utc)
 
-    content = await photo.read()
-    file_key = f"journeys/{operator_id}/{date}/start.jpg"
-    await storage.upload_file(file_key, content, photo.content_type or "image/jpeg")
+    file_key = None
+    if photo is not None:
+        content = await photo.read()
+        file_key = f"journeys/{operator_id}/{date}/start.jpg"
+        await storage.upload_file(file_key, content, photo.content_type or "image/jpeg")
+
+    gps = None
+    if data.latitude is not None and data.longitude is not None and data.accuracy is not None:
+        gps = GpsPoint(latitude=data.latitude, longitude=data.longitude, accuracy=data.accuracy, timestamp=now)
 
     existing = await journey_repository.get_by_operator_and_date(operator_id, date)
-    now = datetime.now(timezone.utc)
-    gps = GpsPoint(latitude=data.latitude, longitude=data.longitude, accuracy=data.accuracy, timestamp=now)
     journey = JourneyEntity(
         id=existing.id if existing else "",
         operator_id=operator_id,
@@ -197,22 +228,31 @@ async def end_journey(
     current_user: CurrentUser,
     journey_repository: JourneyRepositoryDep,
     storage: Annotated[StorageService, Depends(get_storage_service)],
+    device_repository: Annotated[DeviceRepository, Depends(get_device_repository)],
     payload: Annotated[str, Form(...)],
-    photo: UploadFile = File(...),
+    photo: UploadFile | None = File(default=None),
 ) -> None:
     """End-of-day selfie + GPS — feeds the "end_day" event/photo."""
     project_id = _require_project_id(current_user)
     data = JourneyEventRequest.model_validate_json(payload)
+    device = await _get_operator_device(data.device_uid, current_user, device_repository)
+    _validate_journey_requirements(device, data, photo)
+
     date = _today_key()
     operator_id = str(current_user.id)
+    now = datetime.now(timezone.utc)
 
-    content = await photo.read()
-    file_key = f"journeys/{operator_id}/{date}/end.jpg"
-    await storage.upload_file(file_key, content, photo.content_type or "image/jpeg")
+    file_key = None
+    if photo is not None:
+        content = await photo.read()
+        file_key = f"journeys/{operator_id}/{date}/end.jpg"
+        await storage.upload_file(file_key, content, photo.content_type or "image/jpeg")
+
+    gps = None
+    if data.latitude is not None and data.longitude is not None and data.accuracy is not None:
+        gps = GpsPoint(latitude=data.latitude, longitude=data.longitude, accuracy=data.accuracy, timestamp=now)
 
     existing = await journey_repository.get_by_operator_and_date(operator_id, date)
-    now = datetime.now(timezone.utc)
-    gps = GpsPoint(latitude=data.latitude, longitude=data.longitude, accuracy=data.accuracy, timestamp=now)
     journey = JourneyEntity(
         id=existing.id if existing else "",
         operator_id=operator_id,
