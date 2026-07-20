@@ -52,6 +52,8 @@ class AttendanceEntity(CamelCaseModel):
 class AttendanceStats(CamelCaseModel):
     total: int
     today: int
+    yesterday: int
     this_week: int
+    last_week: int
     avg_duration: int
     by_day: list[dict]

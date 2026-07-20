@@ -81,10 +81,14 @@ class MongoAttendanceRepository:
 
         now = datetime.now(timezone.utc)
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        yesterday_start = today_start - timedelta(days=1)
         week_start = today_start - timedelta(days=today_start.weekday())
+        last_week_start = week_start - timedelta(days=7)
 
         today_count = sum(1 for a in attendances if a.created_at >= today_start)
+        yesterday_count = sum(1 for a in attendances if yesterday_start <= a.created_at < today_start)
         week_count = sum(1 for a in attendances if a.created_at >= week_start)
+        last_week_count = sum(1 for a in attendances if last_week_start <= a.created_at < week_start)
         avg_duration = int(sum(a.duration for a in attendances) / len(attendances)) if attendances else 0
 
         by_day_counter: Counter[str] = Counter()
@@ -97,10 +101,37 @@ class MongoAttendanceRepository:
         return AttendanceStats(
             total=len(attendances),
             today=today_count,
+            yesterday=yesterday_count,
             this_week=week_count,
+            last_week=last_week_count,
             avg_duration=avg_duration,
             by_day=by_day,
         )
+
+    async def search_for_report(
+        self,
+        project_id: str,
+        start_date: str | None,
+        end_date: str | None,
+        form_ids: list[str],
+        operator_ids: list[str],
+    ) -> list[AttendanceEntity]:
+        mongo_filter: dict = {"project_id": project_id}
+        if form_ids:
+            mongo_filter["form_id"] = {"$in": form_ids}
+        if operator_ids:
+            mongo_filter["operator_id"] = {"$in": operator_ids}
+        if start_date or end_date:
+            date_filter: dict = {}
+            if start_date:
+                date_filter["$gte"] = start_date
+            if end_date:
+                date_filter["$lte"] = f"{end_date}T23:59:59Z"
+            mongo_filter["created_at"] = date_filter
+
+        cursor = self._collection.find(mongo_filter).sort("created_at", -1)
+        documents = await cursor.to_list(length=None)
+        return [_to_entity(document) for document in documents]
 
     async def create(self, attendance: AttendanceEntity) -> AttendanceEntity:
         document = _to_document(attendance)

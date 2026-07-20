@@ -39,10 +39,12 @@ async def get_stats(
     # No single project requested — aggregate across every project in the caller's org.
     stats_per_project = [await service.get_stats(pid) for pid in allowed] if allowed else []
     if not stats_per_project:
-        return AttendanceStatsResponse(total=0, today=0, this_week=0, avg_duration=0, by_day=[])
+        return AttendanceStatsResponse(total=0, today=0, yesterday=0, this_week=0, last_week=0, avg_duration=0, by_day=[])
     total = sum(stat.total for stat in stats_per_project)
     today = sum(stat.today for stat in stats_per_project)
+    yesterday = sum(stat.yesterday for stat in stats_per_project)
     this_week = sum(stat.this_week for stat in stats_per_project)
+    last_week = sum(stat.last_week for stat in stats_per_project)
     weighted_avg = (
         round(sum(stat.avg_duration * stat.total for stat in stats_per_project) / total) if total else 0
     )
@@ -51,7 +53,10 @@ async def get_stats(
         for entry in stat.by_day:
             by_day_totals[entry["date"]] = by_day_totals.get(entry["date"], 0) + entry["count"]
     by_day = [{"date": date, "count": count} for date, count in sorted(by_day_totals.items())]
-    return AttendanceStatsResponse(total=total, today=today, this_week=this_week, avg_duration=weighted_avg, by_day=by_day)
+    return AttendanceStatsResponse(
+        total=total, today=today, yesterday=yesterday, this_week=this_week, last_week=last_week,
+        avg_duration=weighted_avg, by_day=by_day,
+    )
 
 
 @router.get("/by-form/{form_id}", response_model=list[AttendanceEntity], dependencies=[require_permission(Resource.ATENDIMENTO, PermissionOperation.READ)])

@@ -26,6 +26,7 @@ from app.modules.permissions.infrastructure.models import (  # noqa: F401
     PermissionGroupModel,
     UserPermissionModel,
 )
+from app.modules.notifications.infrastructure.models import NotificationModel  # noqa: F401
 from app.modules.organizations.infrastructure.models import OrganizationModel  # noqa: F401
 from app.modules.projects.infrastructure.models import ProjectModel  # noqa: F401
 from app.modules.reports.infrastructure.models import (  # noqa: F401

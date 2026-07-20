@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, File, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Query, UploadFile
 
 from app.core.exceptions import ForbiddenError, NotFoundError
 from app.core.tenancy import CurrentOrgProjectIds
@@ -43,11 +43,17 @@ async def get_report(
 
 @router.post("", response_model=ReportResponse, status_code=201, dependencies=[require_permission(Resource.RELATORIO, PermissionOperation.CREATE)])
 async def request_report(
-    request: ReportGenerateRequest, current_user: CurrentUser, org_project_ids: CurrentOrgProjectIds, service: ReportServiceDep
+    request: ReportGenerateRequest,
+    current_user: CurrentUser,
+    org_project_ids: CurrentOrgProjectIds,
+    service: ReportServiceDep,
+    background_tasks: BackgroundTasks,
 ) -> ReportResponse:
     if request.project_id not in org_project_ids:
         raise ForbiddenError("That project does not belong to your organization")
-    return await service.request_report(request, current_user.id)
+    report = await service.request_report(request, current_user.id)
+    background_tasks.add_task(service.generate_report_file, report.id)
+    return report
 
 
 @router.post("/{report_id}/file", response_model=ReportResponse, dependencies=[require_permission(Resource.RELATORIO, PermissionOperation.CREATE)])

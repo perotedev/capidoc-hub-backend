@@ -21,3 +21,12 @@ class AttendanceRepository(Protocol):
     async def get_stats(self, project_id: str | None) -> AttendanceStats: ...
 
     async def create(self, attendance: AttendanceEntity) -> AttendanceEntity: ...
+
+    async def search_for_report(
+        self,
+        project_id: str,
+        start_date: str | None,
+        end_date: str | None,
+        form_ids: list[str],
+        operator_ids: list[str],
+    ) -> list[AttendanceEntity]: ...

@@ -1,10 +1,16 @@
+import logging
 import uuid
 from datetime import datetime, timezone
 from uuid import UUID
 
 from app.core.cache import FileUrlCacheService
 from app.core.exceptions import BusinessRuleError, NotFoundError
+from app.core.report_renderer import render_report_file
 from app.core.storage import StorageService
+from app.modules.attendances.domain.repositories import AttendanceRepository
+from app.modules.notifications.application.services import NotificationService
+from app.modules.notifications.domain.entities import NotificationType
+from app.modules.reports.application.rendering import build_report_rows
 from app.modules.reports.application.schemas import ReportGenerateRequest, ReportResponse
 from app.modules.reports.domain.entities import (
     ReportEntity,
@@ -14,6 +20,8 @@ from app.modules.reports.domain.entities import (
     ReportType,
 )
 from app.modules.reports.domain.repositories import ReportRepository
+
+logger = logging.getLogger(__name__)
 
 _CONTENT_TYPE_BY_FORMAT = {
     "PDF": "application/pdf",
@@ -28,10 +36,19 @@ class ReportService:
     service (frontend or a dedicated export worker) and handed back for storage,
     exactly like the Documents module's PDF hand-off."""
 
-    def __init__(self, repository: ReportRepository, storage: StorageService, file_url_cache: FileUrlCacheService) -> None:
+    def __init__(
+        self,
+        repository: ReportRepository,
+        storage: StorageService,
+        file_url_cache: FileUrlCacheService,
+        attendance_repository: AttendanceRepository,
+        notification_service: NotificationService,
+    ) -> None:
         self._repository = repository
         self._storage = storage
         self._file_url_cache = file_url_cache
+        self._attendance_repository = attendance_repository
+        self._notification_service = notification_service
 
     async def _to_response(self, summary: ReportSummary) -> ReportResponse:
         file_url = (
@@ -78,6 +95,46 @@ class ReportService:
         )
         created = await self._repository.create(report)
         return await self.get_report(created.id)
+
+    async def generate_report_file(self, report_id: UUID) -> None:
+        """Actually renders the report file — scheduled as a `BackgroundTasks`
+        job right after `request_report` returns, so the API response isn't
+        blocked on the (synchronous) rendering work."""
+        summary = await self._get_summary(report_id)
+        report = summary.report
+        try:
+            if report.type == ReportType.AUDITORIA:
+                # No audit-log module exists yet, so there is no real data to
+                # report on — fail loudly instead of rendering an empty/fake file.
+                raise BusinessRuleError("No audit-log data source is available yet")
+
+            attendances = await self._attendance_repository.search_for_report(
+                project_id=str(report.project_id),
+                start_date=report.filters.start_date.isoformat() if report.filters.start_date else None,
+                end_date=report.filters.end_date.isoformat() if report.filters.end_date else None,
+                form_ids=report.filters.form_ids,
+                operator_ids=[str(operator_id) for operator_id in report.filters.operator_ids],
+            )
+            title, headers, rows = build_report_rows(report.type, attendances)
+            content = render_report_file(report.filters.format, title, headers, rows)
+            await self.upload_generated_file(report_id, content)
+            await self._notification_service.notify(
+                report.generated_by,
+                NotificationType.REPORT_READY,
+                "Relatório pronto",
+                f'O relatório "{report.name}" foi gerado e está disponível para download.',
+                link="/painel/reports",
+            )
+        except Exception:
+            logger.exception("Failed to generate report %s", report_id)
+            await self.mark_error(report_id)
+            await self._notification_service.notify(
+                report.generated_by,
+                NotificationType.REPORT_ERROR,
+                "Falha ao gerar relatório",
+                f'Não foi possível gerar o relatório "{report.name}".',
+                link="/painel/reports",
+            )
 
     async def upload_generated_file(self, report_id: UUID, content: bytes) -> ReportResponse:
         summary = await self._get_summary(report_id)

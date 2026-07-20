@@ -29,6 +29,9 @@ boto3==1.35.90
 # same engine as the capidoc-tauri desktop app, for cross-app compatibility)
 pymupdf==1.24.13
 
+# Excel report generation (free/open-source, MIT license)
+openpyxl==3.1.5
+
 # Transactional email
 resend==2.5.1
 
