@@ -83,6 +83,12 @@ class Settings(BaseSettings):
     # (n8n owns the WAHA connection/credentials, not this backend).
     whatsapp_webhook_secret: str = "change-this-secret-in-production"
 
+    # Data retention — periodic cleanup started from the app's lifespan (see
+    # app/core/retention.py), no external scheduler needed.
+    activity_retention_days: int = 90
+    notification_retention_days: int = 90
+    retention_cleanup_interval_hours: int = 24
+
     @property
     def postgres_dsn(self) -> str:
         return (

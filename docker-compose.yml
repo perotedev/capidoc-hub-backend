@@ -8,6 +8,8 @@ services:
     volumes:
       - ./app:/app/app
       - ./alembic:/app/alembic
+      - ./tests:/app/tests
+      - ./pytest.ini:/app/pytest.ini
     depends_on:
       postgres:
         condition: service_healthy

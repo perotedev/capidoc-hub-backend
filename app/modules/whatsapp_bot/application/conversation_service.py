@@ -10,7 +10,7 @@ import base64
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from app.core.storage import StorageService
@@ -35,6 +35,7 @@ from app.modules.whatsapp_bot.domain.repositories import WhatsAppConversationRep
 logger = logging.getLogger(__name__)
 
 _UNSUPPORTED_FIELD_TYPES = {FieldType.SIGNATURE}  # everything else, incl. PHOTO/GPS, is supported over chat
+_CONVERSATION_TIMEOUT = timedelta(hours=24)
 _CANCEL_WORDS = {"cancelar", "cancel"}
 _SKIP_WORDS = {"pular", "skip"}
 _YES_WORDS = {"sim", "s", "yes", "y"}
@@ -108,12 +109,20 @@ class WhatsAppBotService:
 
         conversation = await self._conversations.get_by_phone(phone_number)
 
+        expired = conversation is not None and self._is_stale(conversation)
+        if expired:
+            await self._conversations.delete_by_phone(phone_number)
+            conversation = None
+
         if conversation is not None and text_lower in _CANCEL_WORDS:
             await self._conversations.delete_by_phone(phone_number)
             return "Operação cancelada. Envie qualquer mensagem para começar novamente."
 
         if conversation is None:
-            return await self._start_conversation(phone_number, authorization)
+            reply = await self._start_conversation(phone_number, authorization)
+            if expired:
+                return "Sua sessão anterior expirou por inatividade.\n\n" + reply
+            return reply
 
         if conversation.state == ConversationState.AWAITING_FORM_SELECTION:
             return await self._handle_form_selection(conversation, text)
@@ -178,8 +187,10 @@ class WhatsAppBotService:
         fields = _bot_fields(form)
         field = fields[conversation.current_field_index]
 
-        if text_lower in _SKIP_WORDS and not field.required:
-            pass  # leave both answers untouched — field is simply omitted
+        if text_lower in _SKIP_WORDS:
+            if field.required:
+                return "Este campo é obrigatório."
+            # leave both answers untouched — field is simply omitted
         else:
             error = await self._store_answer(conversation, field, request, text, text_lower)
             if error is not None:
@@ -340,6 +351,10 @@ class WhatsAppBotService:
             None,
             authorization.name,
         )
+
+    @staticmethod
+    def _is_stale(conversation: WhatsAppConversationEntity) -> bool:
+        return datetime.now(timezone.utc) - conversation.updated_at > _CONVERSATION_TIMEOUT
 
     @staticmethod
     def _parse_menu_index(text: str, option_count: int) -> int | None:

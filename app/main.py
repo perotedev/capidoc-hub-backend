@@ -1,3 +1,5 @@
+import asyncio
+import contextlib
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -8,6 +10,7 @@ from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.mongodb import close_mongo_client
 from app.core.redis_client import close_redis_client
+from app.core.retention import retention_cleanup_loop
 from app.core.storage import get_storage_service
 
 settings = get_settings()
@@ -16,7 +19,11 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     await get_storage_service().ensure_bucket_exists()
+    cleanup_task = asyncio.create_task(retention_cleanup_loop())
     yield
+    cleanup_task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await cleanup_task
     await close_mongo_client()
     await close_redis_client()
 
