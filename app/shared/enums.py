@@ -35,6 +35,7 @@ class Resource(StrEnum):
     PERMISSAO = "PERMISSAO"
     DISPOSITIVO = "DISPOSITIVO"
     RELATORIO = "RELATORIO"
+    WHATSAPP = "WHATSAPP"
 
 
 class PermissionOperation(StrEnum):

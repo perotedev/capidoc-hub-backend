@@ -86,8 +86,25 @@ services:
       timeout: 5s
       retries: 10
 
+  waha:
+    image: devlikeapro/waha:latest
+    container_name: capidoc-waha
+    env_file: .env
+    environment:
+      WHATSAPP_API_KEY: ${WAHA_API_KEY}
+      WAHA_DASHBOARD_USERNAME: ${WAHA_DASHBOARD_USERNAME}
+      WAHA_DASHBOARD_PASSWORD: ${WAHA_DASHBOARD_PASSWORD}
+      WHATSAPP_SWAGGER_USERNAME: ${WAHA_SWAGGER_USERNAME}
+      WHATSAPP_SWAGGER_PASSWORD: ${WAHA_SWAGGER_PASSWORD}
+    ports:
+      - "3000:3000"
+    volumes:
+      - waha_data:/app/.sessions
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   mongo_data:
   redis_data:
   minio_data:
+  waha_data:

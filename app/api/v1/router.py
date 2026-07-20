@@ -19,6 +19,8 @@ from app.modules.projects.api.v1.endpoints import router as projects_router
 from app.modules.reports.api.v1.endpoints import router as reports_router
 from app.modules.users.api.v1.endpoints import router as users_router
 from app.modules.validation.api.v1.endpoints import router as validation_router
+from app.modules.whatsapp_auth.api.v1.endpoints import router as whatsapp_auth_router
+from app.modules.whatsapp_bot.api.v1.endpoints import router as whatsapp_bot_router
 
 api_v1_router = APIRouter()
 api_v1_router.include_router(auth_router)
@@ -40,3 +42,5 @@ api_v1_router.include_router(validation_router)
 api_v1_router.include_router(mobile_router)
 api_v1_router.include_router(mobile_websocket_router)
 api_v1_router.include_router(notifications_router)
+api_v1_router.include_router(whatsapp_auth_router)
+api_v1_router.include_router(whatsapp_bot_router)

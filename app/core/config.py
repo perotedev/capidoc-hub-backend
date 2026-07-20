@@ -79,6 +79,10 @@ class Settings(BaseSettings):
     n8n_callback_secret: str = "change-this-secret-in-production"
     api_public_base_url: str = "http://localhost:8000"
 
+    # WhatsApp bot conversation — n8n relays WAHA messages to this backend
+    # (n8n owns the WAHA connection/credentials, not this backend).
+    whatsapp_webhook_secret: str = "change-this-secret-in-production"
+
     @property
     def postgres_dsn(self) -> str:
         return (

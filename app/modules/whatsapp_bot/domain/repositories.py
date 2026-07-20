@@ -1,0 +1,13 @@
+from typing import Protocol
+
+from app.modules.whatsapp_bot.domain.entities import WhatsAppConversationEntity
+
+
+class WhatsAppConversationRepository(Protocol):
+    async def get_by_phone(self, phone_number: str) -> WhatsAppConversationEntity | None: ...
+
+    async def create(self, conversation: WhatsAppConversationEntity) -> WhatsAppConversationEntity: ...
+
+    async def update(self, conversation: WhatsAppConversationEntity) -> WhatsAppConversationEntity: ...
+
+    async def delete_by_phone(self, phone_number: str) -> None: ...

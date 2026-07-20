@@ -37,3 +37,5 @@ from app.modules.reports.infrastructure.models import (  # noqa: F401
     ReportModel,
 )
 from app.modules.users.infrastructure.models import UserModel  # noqa: F401
+from app.modules.whatsapp_auth.infrastructure.models import WhatsAppAuthorizationModel  # noqa: F401
+from app.modules.whatsapp_bot.infrastructure.models import WhatsAppConversationModel  # noqa: F401
