@@ -9,6 +9,7 @@ from app.modules.auth.application.schemas import (
     ResetPasswordRequest,
     SessionResponse,
     TokenResponse,
+    VerifyResetCodeRequest,
 )
 from app.modules.users.application.schemas import UserResponse
 
@@ -67,6 +68,11 @@ async def recover_password(request: RecoverPasswordRequest, service: AuthService
     await service.request_password_reset(request.email)
 
 
+@router.post("/verify-reset-code", status_code=204)
+async def verify_reset_code(request: VerifyResetCodeRequest, service: AuthServiceDep) -> None:
+    await service.verify_reset_code(request.email, request.code)
+
+
 @router.post("/reset-password", status_code=204)
 async def reset_password(request: ResetPasswordRequest, service: AuthServiceDep) -> None:
-    await service.reset_password(request.token, request.new_password)
+    await service.reset_password(request.email, request.code, request.new_password)

@@ -52,13 +52,18 @@ class Settings(BaseSettings):
     # CORS
     cors_origins: str = "http://localhost:4200"
 
-    # Email (Resend)
+    # Email (Resend) — when disabled (dev default), emails are logged instead of sent
+    email_enabled: bool = False
     resend_api_key: str = ""
     email_from_address: str = "CapiDoc <no-reply@capidoc.com>"
 
     # Frontend (used to build links embedded in emails)
     frontend_url: str = "http://localhost:4200"
-    password_reset_token_expire_minutes: int = 30
+
+    # Password reset (OTP code, delivered by email)
+    password_reset_code_expire_minutes: int = 15
+    password_reset_cooldown_seconds: int = 60
+    password_reset_max_attempts: int = 5
 
     # Dev seed — auto-creates this super admin on startup if no user with this
     # email exists yet. Leave `default_admin_email` blank to disable.

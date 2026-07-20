@@ -11,7 +11,6 @@ from app.shared.schema import CamelCaseModel
 class UserCreateRequest(CamelCaseModel):
     name: str = Field(min_length=1, max_length=200)
     email: EmailStr
-    password: str = Field(min_length=6, max_length=128)
     cpf: str | None = Field(default=None, max_length=14)
     phone: str | None = Field(default=None, max_length=20)
     role: Role

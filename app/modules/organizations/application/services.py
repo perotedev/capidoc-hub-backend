@@ -72,7 +72,6 @@ class OrganizationService:
             UserCreateRequest(
                 name=request.admin_name,
                 email=request.admin_email,
-                password=request.admin_password,
                 role=Role.ADMIN,
                 project_id=None,
                 department_id=None,

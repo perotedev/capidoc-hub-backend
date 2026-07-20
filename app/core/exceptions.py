@@ -32,6 +32,10 @@ class ForbiddenError(AppError):
     status_code = status.HTTP_403_FORBIDDEN
 
 
+class TooManyRequestsError(AppError):
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+
+
 async def _handle_app_error(_request: Request, exc: AppError) -> JSONResponse:
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
 

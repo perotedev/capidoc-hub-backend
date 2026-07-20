@@ -1,7 +1,9 @@
+import secrets
 import uuid
 from datetime import datetime, timezone
 from uuid import UUID
 
+from app.core.email import EmailService
 from app.core.exceptions import ConflictError, NotFoundError
 from app.core.security import hash_password
 from app.modules.users.application.schemas import UserCreateRequest, UserUpdateRequest
@@ -13,8 +15,9 @@ from app.shared.enums import Role
 class UserService:
     """Application service orchestrating user use-cases on top of `UserRepository`."""
 
-    def __init__(self, repository: UserRepository) -> None:
+    def __init__(self, repository: UserRepository, email_service: EmailService) -> None:
         self._repository = repository
+        self._email_service = email_service
 
     async def get_user(self, user_id: UUID) -> UserEntity:
         user = await self._repository.get_by_id(user_id)
@@ -54,7 +57,11 @@ class UserService:
             id=uuid.uuid4(),
             name=request.name,
             email=request.email,
-            password_hash=hash_password(request.password),
+            # No password is ever registered at creation — the account has no
+            # usable credential until the user sets one via the "forgot
+            # password" OTP flow, so this hash is an unguessable placeholder
+            # that will never be typed in by anyone.
+            password_hash=hash_password(secrets.token_urlsafe(32)),
             cpf=request.cpf,
             phone=request.phone,
             role=request.role,
@@ -66,7 +73,9 @@ class UserService:
             created_at=now,
             updated_at=now,
         )
-        return await self._repository.create(user)
+        created = await self._repository.create(user)
+        await self._email_service.send_welcome_email(created.email, created.name)
+        return created
 
     async def update_user(self, user_id: UUID, request: UserUpdateRequest) -> UserEntity:
         user = await self.get_user(user_id)

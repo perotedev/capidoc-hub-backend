@@ -29,8 +29,14 @@ class RecoverPasswordRequest(CamelCaseModel):
     email: EmailStr
 
 
+class VerifyResetCodeRequest(CamelCaseModel):
+    email: EmailStr
+    code: str = Field(min_length=6, max_length=6)
+
+
 class ResetPasswordRequest(CamelCaseModel):
-    token: str
+    email: EmailStr
+    code: str = Field(min_length=6, max_length=6)
     new_password: str = Field(min_length=6, max_length=128)
 
 
