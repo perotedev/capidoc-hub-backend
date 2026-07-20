@@ -11,6 +11,7 @@ from app.modules.devices.infrastructure.models import (  # noqa: F401
     DeviceDownloadModel,
     DeviceModel,
 )
+from app.modules.document_imports.infrastructure.models import DocumentImportModel  # noqa: F401
 from app.modules.documents.infrastructure.models import (  # noqa: F401
     DocumentModel,
     DocumentTemplateModel,

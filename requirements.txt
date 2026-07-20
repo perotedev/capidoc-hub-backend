@@ -35,6 +35,9 @@ openpyxl==3.1.5
 # Transactional email
 resend==2.5.1
 
+# Outbound HTTP calls (n8n webhook dispatch)
+httpx==0.28.1
+
 # Misc utilities
 python-multipart==0.0.20
 python-dotenv==1.0.1

@@ -71,6 +71,14 @@ class Settings(BaseSettings):
     default_admin_password: str = ""
     default_admin_name: str = "Admin"
 
+    # n8n document-extraction integration — leave `n8n_extraction_webhook_url`
+    # blank to disable (imports fail immediately with a clear message instead
+    # of hanging forever). `api_public_base_url` must be an address n8n can
+    # reach to call `callback_url` back, which usually isn't `localhost`.
+    n8n_extraction_webhook_url: str = ""
+    n8n_callback_secret: str = "change-this-secret-in-production"
+    api_public_base_url: str = "http://localhost:8000"
+
     @property
     def postgres_dsn(self) -> str:
         return (
