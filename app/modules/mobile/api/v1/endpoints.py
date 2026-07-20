@@ -14,7 +14,14 @@ from app.modules.devices.api.v1.dependencies import DeviceServiceDep
 from app.modules.devices.application.schemas import DeviceResponse
 from app.modules.forms.api.v1.dependencies import FormServiceDep
 from app.modules.forms.domain.entities import FieldType, FormEntity, FormStatus
-from app.modules.mobile.application.schemas import AttendanceSubmitRequest, MobileDeviceRegisterRequest
+from app.modules.journeys.dependencies import JourneyRepositoryDep, LocationPingRepositoryDep
+from app.modules.journeys.domain.entities import GpsPoint, JourneyEntity, LocationPingEntity
+from app.modules.mobile.application.schemas import (
+    AttendanceSubmitRequest,
+    JourneyEventRequest,
+    LocationBatchRequest,
+    MobileDeviceRegisterRequest,
+)
 from app.modules.projects.api.v1.dependencies import ProjectServiceDep
 from app.shared.enums import Role
 
@@ -142,3 +149,105 @@ async def submit_attendance(
     created = await attendance_service.create_attendance(attendance)
     await form_service.notify_attendance_submitted(data.form_id)
     return created
+
+
+def _today_key() -> str:
+    return datetime.now(timezone.utc).date().isoformat()
+
+
+@router.post("/journey/start", status_code=204, dependencies=[require_roles(Role.USER)])
+async def start_journey(
+    current_user: CurrentUser,
+    journey_repository: JourneyRepositoryDep,
+    storage: Annotated[StorageService, Depends(get_storage_service)],
+    payload: Annotated[str, Form(...)],
+    photo: UploadFile = File(...),
+) -> None:
+    """Start-of-day selfie + GPS — feeds the "start_day" event and photo shown
+    on the operator's day-detail timeline in the web admin."""
+    project_id = _require_project_id(current_user)
+    data = JourneyEventRequest.model_validate_json(payload)
+    date = _today_key()
+    operator_id = str(current_user.id)
+
+    content = await photo.read()
+    file_key = f"journeys/{operator_id}/{date}/start.jpg"
+    await storage.upload_file(file_key, content, photo.content_type or "image/jpeg")
+
+    existing = await journey_repository.get_by_operator_and_date(operator_id, date)
+    now = datetime.now(timezone.utc)
+    gps = GpsPoint(latitude=data.latitude, longitude=data.longitude, accuracy=data.accuracy, timestamp=now)
+    journey = JourneyEntity(
+        id=existing.id if existing else "",
+        operator_id=operator_id,
+        project_id=str(project_id),
+        date=date,
+        start_photo_file_key=file_key,
+        start_gps=gps,
+        started_at=now,
+        end_photo_file_key=existing.end_photo_file_key if existing else None,
+        end_gps=existing.end_gps if existing else None,
+        ended_at=existing.ended_at if existing else None,
+    )
+    await journey_repository.upsert(journey)
+
+
+@router.post("/journey/end", status_code=204, dependencies=[require_roles(Role.USER)])
+async def end_journey(
+    current_user: CurrentUser,
+    journey_repository: JourneyRepositoryDep,
+    storage: Annotated[StorageService, Depends(get_storage_service)],
+    payload: Annotated[str, Form(...)],
+    photo: UploadFile = File(...),
+) -> None:
+    """End-of-day selfie + GPS — feeds the "end_day" event/photo."""
+    project_id = _require_project_id(current_user)
+    data = JourneyEventRequest.model_validate_json(payload)
+    date = _today_key()
+    operator_id = str(current_user.id)
+
+    content = await photo.read()
+    file_key = f"journeys/{operator_id}/{date}/end.jpg"
+    await storage.upload_file(file_key, content, photo.content_type or "image/jpeg")
+
+    existing = await journey_repository.get_by_operator_and_date(operator_id, date)
+    now = datetime.now(timezone.utc)
+    gps = GpsPoint(latitude=data.latitude, longitude=data.longitude, accuracy=data.accuracy, timestamp=now)
+    journey = JourneyEntity(
+        id=existing.id if existing else "",
+        operator_id=operator_id,
+        project_id=str(project_id),
+        date=date,
+        start_photo_file_key=existing.start_photo_file_key if existing else None,
+        start_gps=existing.start_gps if existing else None,
+        started_at=existing.started_at if existing else None,
+        end_photo_file_key=file_key,
+        end_gps=gps,
+        ended_at=now,
+    )
+    await journey_repository.upsert(journey)
+
+
+@router.post("/locations", status_code=204, dependencies=[require_roles(Role.USER)])
+async def submit_locations(
+    request: LocationBatchRequest,
+    current_user: CurrentUser,
+    location_repository: LocationPingRepositoryDep,
+) -> None:
+    """Batch GPS breadcrumb ingestion — the app buffers pings locally (including
+    while offline) and flushes them here instead of one request per fix."""
+    project_id = _require_project_id(current_user)
+    operator_id = str(current_user.id)
+    pings = [
+        LocationPingEntity(
+            id="",
+            operator_id=operator_id,
+            project_id=str(project_id),
+            date=point.timestamp.date().isoformat(),
+            point=GpsPoint(
+                latitude=point.latitude, longitude=point.longitude, accuracy=point.accuracy, timestamp=point.timestamp
+            ),
+        )
+        for point in request.points
+    ]
+    await location_repository.create_many(pings)

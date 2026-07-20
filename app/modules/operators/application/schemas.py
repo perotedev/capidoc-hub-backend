@@ -1,8 +1,49 @@
 from dataclasses import asdict
+from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from app.modules.operators.domain.entities import OperatorReport
 from app.shared.schema import CamelCaseModel
+
+TimelineEventType = Literal["start_day", "attendance", "end_day"]
+
+
+class GpsPointResponse(CamelCaseModel):
+    latitude: float
+    longitude: float
+    accuracy: float
+    timestamp: datetime
+
+
+class OperatorPhotoResponse(CamelCaseModel):
+    url: str
+    taken_at: datetime
+    gps_location: GpsPointResponse | None
+    gps_unavailable_reason: str | None = None
+
+
+class OperatorTimelineEventResponse(CamelCaseModel):
+    id: str
+    type: TimelineEventType
+    timestamp: datetime
+    title: str
+    description: str
+    gps_location: GpsPointResponse | None
+    attendance_id: str | None
+    form_name: str | None
+    duration: int | None
+
+
+class OperatorDayDetailResponse(CamelCaseModel):
+    date: str
+    start_photo: OperatorPhotoResponse | None
+    end_photo: OperatorPhotoResponse | None
+    timeline: list[OperatorTimelineEventResponse]
+    route: list[GpsPointResponse]
+    total_attendances: int
+    total_duration: int
+    distance_traveled: float
 
 
 class OperatorStatsResponse(CamelCaseModel):

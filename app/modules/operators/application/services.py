@@ -1,15 +1,41 @@
+import math
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
+from app.core.cache import FileUrlCacheService
 from app.core.exceptions import NotFoundError
 from app.modules.attendances.domain.repositories import AttendanceRepository
 from app.modules.departments.domain.repositories import DepartmentRepository
 from app.modules.forms.domain.entities import FormStatus
 from app.modules.forms.domain.repositories import FormRepository
+from app.modules.journeys.domain.entities import GpsPoint, JourneyEntity, LocationPingEntity
+from app.modules.journeys.domain.repositories import JourneyRepository, LocationPingRepository
+from app.modules.operators.application.schemas import (
+    GpsPointResponse,
+    OperatorDayDetailResponse,
+    OperatorPhotoResponse,
+    OperatorTimelineEventResponse,
+)
 from app.modules.operators.domain.entities import OperatorReport, OperatorStats
 from app.modules.projects.domain.repositories import ProjectRepository
 from app.modules.users.application.services import UserService
 from app.shared.enums import Role
+
+_EARTH_RADIUS_KM = 6371.0
+
+
+def _haversine_km(a: GpsPoint, b: GpsPoint) -> float:
+    lat1, lon1, lat2, lon2 = map(math.radians, [a.latitude, a.longitude, b.latitude, b.longitude])
+    d_lat = lat2 - lat1
+    d_lon = lon2 - lon1
+    h = math.sin(d_lat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(d_lon / 2) ** 2
+    return 2 * _EARTH_RADIUS_KM * math.asin(math.sqrt(h))
+
+
+def _to_gps_response(point: GpsPoint | None) -> GpsPointResponse | None:
+    if point is None:
+        return None
+    return GpsPointResponse(latitude=point.latitude, longitude=point.longitude, accuracy=point.accuracy, timestamp=point.timestamp)
 
 
 class OperatorService:
@@ -24,12 +50,18 @@ class OperatorService:
         project_repository: ProjectRepository,
         department_repository: DepartmentRepository,
         form_repository: FormRepository,
+        journey_repository: JourneyRepository,
+        location_ping_repository: LocationPingRepository,
+        file_url_cache: FileUrlCacheService,
     ) -> None:
         self._user_service = user_service
         self._attendance_repository = attendance_repository
         self._project_repository = project_repository
         self._department_repository = department_repository
         self._form_repository = form_repository
+        self._journey_repository = journey_repository
+        self._location_ping_repository = location_ping_repository
+        self._file_url_cache = file_url_cache
 
     async def _today_completion_rate(self, operator_id: UUID, project_id: UUID | None, today_start: datetime) -> int:
         """% of the operator's assigned forms filled at least once today.
@@ -109,3 +141,85 @@ class OperatorService:
     async def list_operators(self, project_ids: list[UUID] | None) -> list[OperatorReport]:
         users = await self._user_service.search_users(query=None, role=Role.USER, project_ids=project_ids)
         return [await self.get_operator(user.id) for user in users]
+
+    async def get_day_detail(self, operator_id: UUID, date: str) -> OperatorDayDetailResponse:
+        """Builds the operator's day timeline from three real sources: the
+        journey's start/end selfie+GPS (reported by the Android app), the
+        attendances they completed that day, and GPS breadcrumbs. Only emits
+        event types we actually have data for — no synthesized "break" or
+        "gps_lost" events."""
+        operator_id_str = str(operator_id)
+        journey = await self._journey_repository.get_by_operator_and_date(operator_id_str, date)
+        pings = await self._location_ping_repository.list_for_operator_date(operator_id_str, date)
+
+        all_attendances = await self._attendance_repository.search(query=None, form_id=None)
+        day_attendances = [
+            a for a in all_attendances
+            if a.operator_id == operator_id_str and a.completed_at.date().isoformat() == date
+        ]
+
+        timeline: list[OperatorTimelineEventResponse] = []
+        start_photo: OperatorPhotoResponse | None = None
+        end_photo: OperatorPhotoResponse | None = None
+
+        if journey is not None:
+            if journey.started_at is not None:
+                timeline.append(OperatorTimelineEventResponse(
+                    id=f"{journey.id}-start", type="start_day", timestamp=journey.started_at,
+                    title="Início do Dia", description="Operador iniciou o dia de trabalho",
+                    gps_location=_to_gps_response(journey.start_gps),
+                    attendance_id=None, form_name=None, duration=None,
+                ))
+                if journey.start_photo_file_key is not None:
+                    start_photo = OperatorPhotoResponse(
+                        url=await self._file_url_cache.get_signed_url(journey.start_photo_file_key),
+                        taken_at=journey.started_at,
+                        gps_location=_to_gps_response(journey.start_gps),
+                        gps_unavailable_reason=None,
+                    )
+            if journey.ended_at is not None:
+                timeline.append(OperatorTimelineEventResponse(
+                    id=f"{journey.id}-end", type="end_day", timestamp=journey.ended_at,
+                    title="Fim do Dia", description="Operador encerrou o dia de trabalho",
+                    gps_location=_to_gps_response(journey.end_gps),
+                    attendance_id=None, form_name=None, duration=None,
+                ))
+                if journey.end_photo_file_key is not None:
+                    end_photo = OperatorPhotoResponse(
+                        url=await self._file_url_cache.get_signed_url(journey.end_photo_file_key),
+                        taken_at=journey.ended_at,
+                        gps_location=_to_gps_response(journey.end_gps),
+                        gps_unavailable_reason=None,
+                    )
+
+        for attendance in day_attendances:
+            timeline.append(OperatorTimelineEventResponse(
+                id=attendance.id, type="attendance", timestamp=attendance.completed_at,
+                title=attendance.form_name, description=attendance.project_name,
+                gps_location=_to_gps_response(GpsPoint(
+                    latitude=attendance.gps_location.latitude,
+                    longitude=attendance.gps_location.longitude,
+                    accuracy=attendance.gps_location.accuracy,
+                    timestamp=attendance.completed_at,
+                )) if attendance.gps_location else None,
+                attendance_id=attendance.id, form_name=attendance.form_name, duration=attendance.duration,
+            ))
+
+        timeline.sort(key=lambda event: event.timestamp)
+
+        route = [_to_gps_response(ping.point) for ping in pings]
+        route_points = [ping.point for ping in pings]
+        distance_km = sum(
+            _haversine_km(route_points[i], route_points[i + 1]) for i in range(len(route_points) - 1)
+        )
+
+        return OperatorDayDetailResponse(
+            date=date,
+            start_photo=start_photo,
+            end_photo=end_photo,
+            timeline=timeline,
+            route=[point for point in route if point is not None],
+            total_attendances=len(day_attendances),
+            total_duration=sum(a.duration for a in day_attendances),
+            distance_traveled=round(distance_km, 2),
+        )

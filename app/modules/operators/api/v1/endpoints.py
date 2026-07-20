@@ -6,7 +6,7 @@ from app.core.exceptions import ForbiddenError, NotFoundError
 from app.core.tenancy import CurrentOrgProjectIds
 from app.modules.auth.api.v1.dependencies import CurrentUser, require_permission
 from app.modules.operators.api.v1.dependencies import OperatorServiceDep
-from app.modules.operators.application.schemas import OperatorResponse
+from app.modules.operators.application.schemas import OperatorDayDetailResponse, OperatorResponse
 from app.shared.enums import PermissionOperation, Resource
 
 router = APIRouter(prefix="/operators", tags=["Operators"])
@@ -34,3 +34,21 @@ async def get_operator(
     if report.project_id not in org_project_ids:
         raise NotFoundError(f"Operator {operator_id} not found")
     return OperatorResponse.from_entity(report)
+
+
+@router.get(
+    "/{operator_id}/day-detail",
+    response_model=OperatorDayDetailResponse,
+    dependencies=[require_permission(Resource.OPERADOR, PermissionOperation.READ)],
+)
+async def get_operator_day_detail(
+    operator_id: UUID,
+    _current_user: CurrentUser,
+    org_project_ids: CurrentOrgProjectIds,
+    service: OperatorServiceDep,
+    date: str = Query(..., description="YYYY-MM-DD"),
+) -> OperatorDayDetailResponse:
+    report = await service.get_operator(operator_id)
+    if report.project_id not in org_project_ids:
+        raise NotFoundError(f"Operator {operator_id} not found")
+    return await service.get_day_detail(operator_id, date)

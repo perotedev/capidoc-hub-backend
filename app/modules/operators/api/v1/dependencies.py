@@ -4,6 +4,7 @@ from fastapi import Depends
 from pymongo.asynchronous.database import AsyncDatabase
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import FileUrlCacheServiceDep
 from app.core.database import get_db_session
 from app.core.mongodb import get_mongo_db
 from app.modules.attendances.domain.repositories import AttendanceRepository
@@ -12,6 +13,7 @@ from app.modules.departments.domain.repositories import DepartmentRepository
 from app.modules.departments.infrastructure.repository import SqlAlchemyDepartmentRepository
 from app.modules.forms.api.v1.dependencies import get_form_repository
 from app.modules.forms.domain.repositories import FormRepository
+from app.modules.journeys.dependencies import JourneyRepositoryDep, LocationPingRepositoryDep
 from app.modules.operators.application.services import OperatorService
 from app.modules.projects.domain.repositories import ProjectRepository
 from app.modules.projects.infrastructure.repository import SqlAlchemyProjectRepository
@@ -38,9 +40,19 @@ def get_operator_service(
     project_repository: Annotated[ProjectRepository, Depends(_get_project_repository)],
     department_repository: Annotated[DepartmentRepository, Depends(_get_department_repository)],
     form_repository: Annotated[FormRepository, Depends(get_form_repository)],
+    journey_repository: JourneyRepositoryDep,
+    location_ping_repository: LocationPingRepositoryDep,
+    file_url_cache: FileUrlCacheServiceDep,
 ) -> OperatorService:
     return OperatorService(
-        user_service, attendance_repository, project_repository, department_repository, form_repository
+        user_service,
+        attendance_repository,
+        project_repository,
+        department_repository,
+        form_repository,
+        journey_repository,
+        location_ping_repository,
+        file_url_cache,
     )
 
 

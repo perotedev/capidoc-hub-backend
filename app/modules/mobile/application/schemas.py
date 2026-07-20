@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import Field
 
 from app.modules.attendances.domain.entities import GpsLocation
@@ -34,3 +36,26 @@ class AttendanceSubmitRequest(CamelCaseModel):
     responses: list[AttendanceResponseInput] = Field(default_factory=list)
     photos: list[AttendancePhotoInput] = Field(default_factory=list)
     gps_location: GpsLocation | None = None
+
+
+class JourneyEventRequest(CamelCaseModel):
+    """Payload accompanying the start/end-of-day selfie — the photo itself is
+    a separate multipart file part."""
+
+    latitude: float
+    longitude: float
+    accuracy: float
+
+
+class LocationPingInput(CamelCaseModel):
+    latitude: float
+    longitude: float
+    accuracy: float
+    timestamp: datetime
+
+
+class LocationBatchRequest(CamelCaseModel):
+    """The Android app batches breadcrumbs collected while offline and flushes
+    them in one call — avoids one request per GPS fix."""
+
+    points: list[LocationPingInput] = Field(default_factory=list)
