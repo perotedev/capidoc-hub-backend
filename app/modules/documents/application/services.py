@@ -3,6 +3,8 @@ import uuid
 from datetime import datetime, timezone
 from uuid import UUID
 
+from starlette.concurrency import run_in_threadpool
+
 from app.core.cache import FileUrlCacheService
 from app.core.exceptions import BusinessRuleError, ConflictError, NotFoundError
 from app.core.pdf_renderer import render_document_pdf
@@ -227,8 +229,13 @@ class DocumentService:
         attendance = await self._attendance_repository.get_by_id(document.attendance_id)
         field_values = _field_values_from_responses(attendance.responses) if attendance else {}
 
-        pdf_bytes = render_document_pdf(
-            base_pdf_bytes, form.template, field_values, header_logo_bytes, footer_text, document.validation_code
+        # PyMuPDF rendering is synchronous/CPU-bound — offloaded to a thread so
+        # it doesn't block the event loop (and every other in-flight request)
+        # for the duration of the render, especially on a small single-core
+        # instance under any concurrent load.
+        pdf_bytes = await run_in_threadpool(
+            render_document_pdf,
+            base_pdf_bytes, form.template, field_values, header_logo_bytes, footer_text, document.validation_code,
         )
 
         file_key = f"documents/{document.project_id}/{document.id}.pdf"

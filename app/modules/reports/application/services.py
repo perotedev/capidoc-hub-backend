@@ -3,6 +3,8 @@ import uuid
 from datetime import datetime, timezone
 from uuid import UUID
 
+from starlette.concurrency import run_in_threadpool
+
 from app.core.cache import FileUrlCacheService
 from app.core.exceptions import BusinessRuleError, NotFoundError
 from app.core.report_renderer import render_report_file
@@ -116,7 +118,10 @@ class ReportService:
                 operator_ids=[str(operator_id) for operator_id in report.filters.operator_ids],
             )
             title, headers, rows = build_report_rows(report.type, attendances)
-            content = render_report_file(report.filters.format, title, headers, rows)
+            # PDF/XLSX rendering (PyMuPDF/openpyxl) is synchronous/CPU-bound —
+            # offloaded to a thread so a big report doesn't block the event
+            # loop (and every other in-flight request) while it renders.
+            content = await run_in_threadpool(render_report_file, report.filters.format, title, headers, rows)
             await self.upload_generated_file(report_id, content)
             await self._notification_service.notify(
                 report.generated_by,
