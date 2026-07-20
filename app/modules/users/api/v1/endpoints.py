@@ -4,6 +4,8 @@ from fastapi import APIRouter, Query
 
 from app.core.exceptions import ForbiddenError, NotFoundError
 from app.core.tenancy import CurrentOrgId
+from app.modules.activities.api.v1.dependencies import ActivityServiceDep
+from app.modules.activities.domain.entities import ActivityType
 from app.modules.auth.api.v1.dependencies import CurrentUser, require_permission
 from app.modules.projects.api.v1.dependencies import ProjectServiceDep
 from app.modules.users.api.v1.dependencies import UserServiceDep
@@ -60,6 +62,7 @@ async def create_user(
     org_id: CurrentOrgId,
     service: UserServiceDep,
     project_service: ProjectServiceDep,
+    activity_service: ActivityServiceDep,
 ) -> UserResponse:
     creatable = _CREATABLE_BY.get(current_user.role, set())
     if request.role not in creatable:
@@ -71,6 +74,15 @@ async def create_user(
             raise ForbiddenError("That project does not belong to your organization")
 
     user = await service.create_user(request)
+    await activity_service.log(
+        org_id,
+        ActivityType.USER,
+        "Usuário criado",
+        f'{current_user.name} criou a conta de {user.name} ({user.role})',
+        "user-plus",
+        current_user.id,
+        current_user.name,
+    )
     return UserResponse.from_summary(await service.get_user_summary(user.id))
 
 

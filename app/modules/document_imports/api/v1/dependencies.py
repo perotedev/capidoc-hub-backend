@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.cache import FileUrlCacheServiceDep
 from app.core.database import get_db_session
 from app.core.storage import StorageService, get_storage_service
+from app.modules.activities.api.v1.dependencies import get_activity_service
+from app.modules.activities.application.services import ActivityService
 from app.modules.attendances.api.v1.dependencies import get_attendance_repository
 from app.modules.attendances.domain.repositories import AttendanceRepository
 from app.modules.document_imports.application.services import DocumentImportService
@@ -32,9 +34,11 @@ def get_document_import_service(
     attendance_repository: Annotated[AttendanceRepository, Depends(get_attendance_repository)],
     project_repository: Annotated[ProjectRepository, Depends(get_project_repository)],
     notification_service: Annotated[NotificationService, Depends(get_notification_service)],
+    activity_service: Annotated[ActivityService, Depends(get_activity_service)],
 ) -> DocumentImportService:
     return DocumentImportService(
-        repository, storage, file_url_cache, form_service, attendance_repository, project_repository, notification_service
+        repository, storage, file_url_cache, form_service, attendance_repository,
+        project_repository, notification_service, activity_service,
     )
 
 

@@ -2,6 +2,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, File, Query, UploadFile
 
+from app.modules.activities.api.v1.dependencies import ActivityServiceDep
+from app.modules.activities.domain.entities import ActivityType
 from app.modules.auth.api.v1.dependencies import CurrentUser
 from app.modules.documents.api.v1.dependencies import DocumentServiceDep, DocumentTemplateServiceDep
 from app.modules.documents.application.schemas import (
@@ -43,20 +45,42 @@ async def get_document(document_id: UUID, _current_user: CurrentUser, service: D
 
 @router.post("", response_model=DocumentResponse, status_code=201)
 async def register_document(
-    request: DocumentGenerateRequest, _current_user: CurrentUser, service: DocumentServiceDep
+    request: DocumentGenerateRequest, current_user: CurrentUser, service: DocumentServiceDep, activity_service: ActivityServiceDep
 ) -> DocumentResponse:
-    return await service.register_document(request)
+    document = await service.register_document(request)
+    if document.status == DocStatus.GENERATED:
+        await activity_service.log_for_project(
+            document.project_id,
+            ActivityType.DOCUMENT,
+            "Documento gerado",
+            f'Documento de "{document.form_name}" gerado para {document.operator_name}',
+            "file-check",
+            current_user.id,
+            current_user.name,
+        )
+    return document
 
 
 @router.post("/{document_id}/pdf", response_model=DocumentResponse)
 async def upload_document_pdf(
     document_id: UUID,
-    _current_user: CurrentUser,
+    current_user: CurrentUser,
     service: DocumentServiceDep,
+    activity_service: ActivityServiceDep,
     file: UploadFile = File(...),
 ) -> DocumentResponse:
     content = await file.read()
-    return await service.upload_generated_pdf(document_id, content)
+    document = await service.upload_generated_pdf(document_id, content)
+    await activity_service.log_for_project(
+        document.project_id,
+        ActivityType.DOCUMENT,
+        "Documento gerado",
+        f'Documento de "{document.form_name}" gerado para {document.operator_name}',
+        "file-check",
+        current_user.id,
+        current_user.name,
+    )
+    return document
 
 
 @router.post("/{document_id}/revoke", response_model=DocumentResponse)

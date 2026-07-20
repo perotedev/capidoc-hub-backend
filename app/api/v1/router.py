@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.modules.activities.api.v1.endpoints import router as activities_router
 from app.modules.attendances.api.v1.endpoints import router as attendances_router
 from app.modules.auth.api.v1.endpoints import router as auth_router
 from app.modules.dashboards_custom.api.v1.endpoints import router as dashboards_custom_router
@@ -23,6 +24,7 @@ from app.modules.whatsapp_auth.api.v1.endpoints import router as whatsapp_auth_r
 from app.modules.whatsapp_bot.api.v1.endpoints import router as whatsapp_bot_router
 
 api_v1_router = APIRouter()
+api_v1_router.include_router(activities_router)
 api_v1_router.include_router(auth_router)
 api_v1_router.include_router(organizations_router)
 api_v1_router.include_router(users_router)

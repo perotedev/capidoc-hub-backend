@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, File, Form, UploadFile
 from app.core.exceptions import BusinessRuleError, NotFoundError
 from app.core.storage import StorageService, get_storage_service
 from app.core.tenancy import CurrentOrgId
+from app.modules.activities.api.v1.dependencies import ActivityServiceDep
+from app.modules.activities.domain.entities import ActivityType
 from app.modules.attendances.api.v1.dependencies import AttendanceServiceDep
 from app.modules.attendances.domain.entities import AttendanceEntity, AttendancePhoto, AttendanceResponse
 from app.modules.auth.api.v1.dependencies import CurrentUser, require_roles
@@ -86,6 +88,7 @@ async def submit_attendance(
     project_service: ProjectServiceDep,
     org_id: CurrentOrgId,
     storage: Annotated[StorageService, Depends(get_storage_service)],
+    activity_service: ActivityServiceDep,
     payload: Annotated[str, Form(...)],
     photo_files: list[UploadFile] = File(default=[]),
 ) -> AttendanceEntity:
@@ -150,6 +153,15 @@ async def submit_attendance(
     )
     created = await attendance_service.create_attendance(attendance)
     await form_service.notify_attendance_submitted(data.form_id)
+    await activity_service.log(
+        org_id,
+        ActivityType.ATTENDANCE,
+        "Atendimento registrado",
+        f'{current_user.name} respondeu "{form.name}"',
+        "clipboard-check",
+        current_user.id,
+        current_user.name,
+    )
     return created
 
 

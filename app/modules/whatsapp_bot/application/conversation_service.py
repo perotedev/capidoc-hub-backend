@@ -14,6 +14,8 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from app.core.storage import StorageService
+from app.modules.activities.application.services import ActivityService
+from app.modules.activities.domain.entities import ActivityType
 from app.modules.attendances.domain.entities import AttendanceEntity, AttendancePhoto, AttendanceResponse
 from app.modules.attendances.domain.repositories import AttendanceRepository
 from app.modules.forms.application.services import FormService
@@ -86,12 +88,14 @@ class WhatsAppBotService:
         form_service: FormService,
         attendance_repository: AttendanceRepository,
         storage: StorageService,
+        activity_service: ActivityService,
     ) -> None:
         self._conversations = conversation_repository
         self._authorizations = authorization_service
         self._forms = form_service
         self._attendances = attendance_repository
         self._storage = storage
+        self._activity_service = activity_service
 
     async def handle_message(self, request: WhatsAppIncomingMessageRequest) -> str:
         phone_number = normalize_phone_number(request.phone_number)
@@ -327,6 +331,15 @@ class WhatsAppBotService:
         )
         await self._attendances.create(attendance)
         await self._forms.notify_attendance_submitted(form.id)
+        await self._activity_service.log_for_project(
+            authorization.project_id,
+            ActivityType.ATTENDANCE,
+            "Atendimento registrado",
+            f'{authorization.name} respondeu "{form.name}" via WhatsApp',
+            "message-circle",
+            None,
+            authorization.name,
+        )
 
     @staticmethod
     def _parse_menu_index(text: str, option_count: int) -> int | None:

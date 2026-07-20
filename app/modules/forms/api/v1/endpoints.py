@@ -8,6 +8,8 @@ from redis.asyncio import Redis
 from app.core.exceptions import NotFoundError
 from app.core.redis_client import get_redis_client
 from app.core.tenancy import CurrentOrgProjectIds
+from app.modules.activities.api.v1.dependencies import ActivityServiceDep
+from app.modules.activities.domain.entities import ActivityType
 from app.modules.auth.api.v1.dependencies import CurrentUser, require_permission
 from app.modules.forms.api.v1.dependencies import FormServiceDep
 from app.modules.forms.application.schemas import CreateFieldRequest, FormCreateRequest, FormRenameRequest
@@ -126,15 +128,25 @@ async def get_template_pdf(
 @router.post("/{form_id}/publish", response_model=FormEntity, dependencies=[require_permission(Resource.FORMULARIO, PermissionOperation.UPDATE)])
 async def publish_form(
     form_id: str,
-    _current_user: CurrentUser,
+    current_user: CurrentUser,
     org_project_ids: CurrentOrgProjectIds,
     service: FormServiceDep,
     redis_client: Annotated[Redis, Depends(get_redis_client)],
+    activity_service: ActivityServiceDep,
 ) -> FormEntity:
     await _assert_form_in_org(await service.get_form(form_id), org_project_ids)
     await service.publish(form_id)
     form = await service.get_form(form_id)
     await publish_form_event(redis_client, "published", form)
+    await activity_service.log_for_project(
+        UUID(form.project_id),
+        ActivityType.FORM,
+        "Formulário publicado",
+        f'{current_user.name} publicou "{form.name}"',
+        "file-text",
+        current_user.id,
+        current_user.name,
+    )
     return form
 
 

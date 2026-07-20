@@ -5,6 +5,7 @@ diffs the metadata against the live database — this module is that single
 import point, referenced from `alembic/env.py`.
 """
 
+from app.modules.activities.infrastructure.models import ActivityModel  # noqa: F401
 from app.modules.departments.infrastructure.models import DepartmentModel  # noqa: F401
 from app.modules.devices.infrastructure.models import (  # noqa: F401
     DeviceDownloadDetailModel,

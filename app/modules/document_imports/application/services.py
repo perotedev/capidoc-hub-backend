@@ -9,6 +9,8 @@ from app.core.cache import FileUrlCacheService
 from app.core.config import get_settings
 from app.core.exceptions import BusinessRuleError, NotFoundError, UnauthorizedError
 from app.core.storage import StorageService
+from app.modules.activities.application.services import ActivityService
+from app.modules.activities.domain.entities import ActivityType
 from app.modules.attendances.domain.entities import AttendanceEntity, AttendanceResponse
 from app.modules.attendances.domain.repositories import AttendanceRepository
 from app.modules.document_imports.application.extraction_schema import (
@@ -50,12 +52,14 @@ class DocumentImportService:
         attendance_repository: AttendanceRepository,
         project_repository: ProjectRepository,
         notification_service: NotificationService,
+        activity_service: ActivityService,
     ) -> None:
         self._repository = repository
         self._storage = storage
         self._file_url_cache = file_url_cache
         self._form_service = form_service
         self._attendance_repository = attendance_repository
+        self._activity_service = activity_service
         self._project_repository = project_repository
         self._notification_service = notification_service
 
@@ -216,6 +220,15 @@ class DocumentImportService:
         )
         created = await self._attendance_repository.create(attendance)
         await self._form_service.notify_attendance_submitted(form.id)
+        await self._activity_service.log(
+            project.org_id,
+            ActivityType.ATTENDANCE,
+            "Atendimento registrado",
+            f'{user_name} respondeu "{form.name}" via importação de documento',
+            "file-up",
+            user_id,
+            user_name,
+        )
 
         document_import.status = DocumentImportStatus.CONFIRMED
         document_import.attendance_id = created.id
