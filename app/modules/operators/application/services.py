@@ -13,8 +13,9 @@ from app.shared.enums import Role
 
 
 class OperatorService:
-    """Aggregates operator (role=OPERADOR) identity data from Postgres with their
-    attendance activity from MongoDB into a single reporting view."""
+    """Aggregates operator (role=USER — the field-app role since GESTOR/OPERADOR
+    were retired) identity data from Postgres with their attendance activity
+    from MongoDB into a single reporting view."""
 
     def __init__(
         self,
@@ -79,7 +80,7 @@ class OperatorService:
 
     async def get_operator(self, operator_id: UUID) -> OperatorReport:
         user = await self._user_service.get_user(operator_id)
-        if user.role != Role.OPERADOR:
+        if user.role != Role.USER:
             raise NotFoundError(f"Operator {operator_id} not found")
 
         project_name = None
@@ -105,6 +106,6 @@ class OperatorService:
             stats=stats,
         )
 
-    async def list_operators(self, project_id: UUID | None) -> list[OperatorReport]:
-        users = await self._user_service.search_users(query=None, role=Role.OPERADOR, project_id=project_id)
+    async def list_operators(self, project_ids: list[UUID] | None) -> list[OperatorReport]:
+        users = await self._user_service.search_users(query=None, role=Role.USER, project_ids=project_ids)
         return [await self.get_operator(user.id) for user in users]

@@ -1,17 +1,16 @@
 from datetime import datetime
 
-from pydantic import BaseModel
-
 from app.modules.attendances.domain.entities import AttendanceResponse, GpsLocation
+from app.shared.schema import CamelCaseModel
 
 
-class AttendancePhotoResponse(BaseModel):
+class AttendancePhotoResponse(CamelCaseModel):
     id: str
     caption: str
     url: str
 
 
-class AttendanceDetailResponse(BaseModel):
+class AttendanceDetailResponse(CamelCaseModel):
     """API response for an attendance — like `AttendanceEntity`, but with each
     photo's S3 key resolved to a temporary signed URL (cached in Redis)."""
 
@@ -32,7 +31,7 @@ class AttendanceDetailResponse(BaseModel):
     synced_at: datetime | None
 
 
-class AttendanceStatsResponse(BaseModel):
+class AttendanceStatsResponse(CamelCaseModel):
     total: int
     today: int
     this_week: int

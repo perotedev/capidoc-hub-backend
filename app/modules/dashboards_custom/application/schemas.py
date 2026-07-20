@@ -1,13 +1,15 @@
+from dataclasses import asdict
 from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from app.modules.dashboards_custom.domain.entities import DashboardCustomSummary, WidgetType
+from app.shared.schema import CamelCaseModel
 
 
-class WidgetConfigSchema(BaseModel):
+class WidgetConfigSchema(CamelCaseModel):
     data_source: str
     filters: dict[str, str] = Field(default_factory=dict)
     period: str = ""
@@ -17,14 +19,14 @@ class WidgetConfigSchema(BaseModel):
     custom_options: dict[str, Any] = Field(default_factory=dict)
 
 
-class WidgetPositionSchema(BaseModel):
+class WidgetPositionSchema(CamelCaseModel):
     x: int
     y: int
     cols: int
     rows: int
 
 
-class DashboardWidgetSchema(BaseModel):
+class DashboardWidgetSchema(CamelCaseModel):
     id: UUID | None = None
     type: WidgetType
     title: str
@@ -32,13 +34,13 @@ class DashboardWidgetSchema(BaseModel):
     position: WidgetPositionSchema
 
 
-class DashboardCreateRequest(BaseModel):
+class DashboardCreateRequest(CamelCaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str = ""
     project_id: UUID
 
 
-class DashboardUpdateRequest(BaseModel):
+class DashboardUpdateRequest(CamelCaseModel):
     name: str | None = None
     description: str | None = None
     widgets: list[DashboardWidgetSchema] | None = None
@@ -46,12 +48,12 @@ class DashboardUpdateRequest(BaseModel):
     shared_with: list[UUID] | None = None
 
 
-class AddWidgetRequest(BaseModel):
+class AddWidgetRequest(CamelCaseModel):
     type: WidgetType
     title: str
 
 
-class DashboardResponse(BaseModel):
+class DashboardResponse(CamelCaseModel):
     id: UUID
     name: str
     description: str
@@ -81,8 +83,8 @@ class DashboardResponse(BaseModel):
                     id=widget.id,
                     type=widget.type,
                     title=widget.title,
-                    config=WidgetConfigSchema(**vars(widget.config)),
-                    position=WidgetPositionSchema(**vars(widget.position)),
+                    config=WidgetConfigSchema(**asdict(widget.config)),
+                    position=WidgetPositionSchema(**asdict(widget.position)),
                 )
                 for widget in dashboard.widgets
             ],

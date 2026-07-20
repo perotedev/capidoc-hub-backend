@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from app.modules.devices.domain.entities import (
     DeviceStatus,
@@ -9,9 +9,10 @@ from app.modules.devices.domain.entities import (
     DownloadDetailStatus,
     DownloadStatus,
 )
+from app.shared.schema import CamelCaseModel
 
 
-class DeviceRegisterRequest(BaseModel):
+class DeviceRegisterRequest(CamelCaseModel):
     uid: str = Field(min_length=1, max_length=200)
     device_number: str = Field(min_length=1, max_length=50)
     license_last4: str = Field(min_length=4, max_length=4)
@@ -21,7 +22,7 @@ class DeviceRegisterRequest(BaseModel):
     app_version: str
 
 
-class DeviceUpdateRequest(BaseModel):
+class DeviceUpdateRequest(CamelCaseModel):
     model: str | None = None
     os_version: str | None = None
     app_version: str | None = None
@@ -29,7 +30,7 @@ class DeviceUpdateRequest(BaseModel):
     assigned_to: UUID | None = None
 
 
-class DeviceResponse(BaseModel):
+class DeviceResponse(CamelCaseModel):
     id: UUID
     uid: str
     device_number: str
@@ -65,14 +66,14 @@ class DeviceResponse(BaseModel):
         )
 
 
-class DeviceDownloadDetailCreateRequest(BaseModel):
+class DeviceDownloadDetailCreateRequest(CamelCaseModel):
     form_id: str
     form_name: str
     records_count: int = 0
     status: DownloadDetailStatus
 
 
-class DeviceDownloadCreateRequest(BaseModel):
+class DeviceDownloadCreateRequest(CamelCaseModel):
     forms_downloaded: int = 0
     records_uploaded: int = 0
     status: DownloadStatus
@@ -80,14 +81,14 @@ class DeviceDownloadCreateRequest(BaseModel):
     details: list[DeviceDownloadDetailCreateRequest] = Field(default_factory=list)
 
 
-class DeviceDownloadDetailResponse(BaseModel):
+class DeviceDownloadDetailResponse(CamelCaseModel):
     form_id: str
     form_name: str
     records_count: int
     status: DownloadDetailStatus
 
 
-class DeviceDownloadResponse(BaseModel):
+class DeviceDownloadResponse(CamelCaseModel):
     id: UUID
     timestamp: datetime
     forms_downloaded: int

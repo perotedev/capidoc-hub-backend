@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.permissions.domain.entities import (
@@ -52,17 +52,13 @@ class SqlAlchemyPermissionRepository:
         return _group_to_entity(model) if model else None
 
     async def _build_summary(self, model: PermissionGroupModel, project_name: str) -> PermissionGroupSummary:
-        members_count_result = await self._session.execute(
-            select(func.count(PermissionGroupMemberModel.user_id)).where(
-                PermissionGroupMemberModel.group_id == model.id
-            )
-        )
-        members_count = members_count_result.scalar_one()
+        member_ids = await self.get_member_ids(model.id)
         permissions = await self.get_group_permissions(model.id)
         return PermissionGroupSummary(
             group=_group_to_entity(model),
             project_name=project_name,
-            members_count=members_count,
+            members_count=len(member_ids),
+            member_ids=member_ids,
             permissions=permissions,
         )
 
@@ -78,12 +74,12 @@ class SqlAlchemyPermissionRepository:
         model, project_name = row
         return await self._build_summary(model, project_name)
 
-    async def search(self, query: str | None, project_id: UUID | None) -> list[PermissionGroupSummary]:
+    async def search(self, query: str | None, project_ids: list[UUID] | None = None) -> list[PermissionGroupSummary]:
         statement = select(PermissionGroupModel, ProjectModel.name).join(
             ProjectModel, ProjectModel.id == PermissionGroupModel.project_id
         )
-        if project_id is not None:
-            statement = statement.where(PermissionGroupModel.project_id == project_id)
+        if project_ids is not None:
+            statement = statement.where(PermissionGroupModel.project_id.in_(project_ids))
         if query:
             like_pattern = f"%{query}%"
             statement = statement.where(

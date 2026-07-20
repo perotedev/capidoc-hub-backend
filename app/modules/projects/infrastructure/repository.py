@@ -4,6 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.departments.infrastructure.models import DepartmentModel
+from app.modules.organizations.infrastructure.models import OrganizationModel
 from app.modules.projects.domain.entities import ProjectEntity, ProjectSummary
 from app.modules.projects.infrastructure.models import ProjectModel
 from app.modules.users.infrastructure.models import UserModel
@@ -15,7 +16,7 @@ def _to_entity(model: ProjectModel) -> ProjectEntity:
         name=model.name,
         description=model.description,
         cnpj=model.cnpj,
-        admin_id=model.admin_id,
+        org_id=model.org_id,
         active=model.active,
         created_at=model.created_at,
         updated_at=model.updated_at,
@@ -41,21 +42,21 @@ class SqlAlchemyProjectRepository:
         )
         return select(
             ProjectModel,
-            UserModel.name,
+            OrganizationModel.name,
             users_count_subquery.label("users_count"),
             departments_count_subquery.label("departments_count"),
-        ).outerjoin(UserModel, UserModel.id == ProjectModel.admin_id)
+        ).join(OrganizationModel, OrganizationModel.id == ProjectModel.org_id)
 
     async def _execute_summary(self, statement) -> list[ProjectSummary]:
         result = await self._session.execute(statement.order_by(ProjectModel.name))
         return [
             ProjectSummary(
                 project=_to_entity(project_model),
-                admin_name=admin_name,
+                org_name=org_name,
                 users_count=users_count,
                 departments_count=departments_count,
             )
-            for project_model, admin_name, users_count, departments_count in result.all()
+            for project_model, org_name, users_count, departments_count in result.all()
         ]
 
     async def get_by_id(self, project_id: UUID) -> ProjectEntity | None:
@@ -67,8 +68,10 @@ class SqlAlchemyProjectRepository:
         summaries = await self._execute_summary(statement)
         return summaries[0] if summaries else None
 
-    async def search(self, query: str | None) -> list[ProjectSummary]:
+    async def search(self, query: str | None, org_id: UUID | None = None) -> list[ProjectSummary]:
         statement = self._summary_statement()
+        if org_id is not None:
+            statement = statement.where(ProjectModel.org_id == org_id)
         if query:
             like_pattern = f"%{query}%"
             statement = statement.where(
@@ -82,7 +85,7 @@ class SqlAlchemyProjectRepository:
             name=project.name,
             description=project.description,
             cnpj=project.cnpj,
-            admin_id=project.admin_id,
+            org_id=project.org_id,
             active=project.active,
         )
         self._session.add(model)
@@ -97,7 +100,6 @@ class SqlAlchemyProjectRepository:
         model.name = project.name
         model.description = project.description
         model.cnpj = project.cnpj
-        model.admin_id = project.admin_id
         model.active = project.active
         await self._session.commit()
         await self._session.refresh(model)

@@ -28,7 +28,19 @@ class UserEntity:
         return self.role == Role.SUPER_ADMIN
 
     def is_admin(self) -> bool:
-        return self.role in (Role.SUPER_ADMIN, Role.ADMIN_PROJECT)
+        return self.role == Role.ADMIN
+
+    def is_auditor(self) -> bool:
+        return self.role == Role.AUDITOR
 
     def can_authenticate(self) -> bool:
         return self.active
+
+
+@dataclass(slots=True)
+class UserSummary:
+    """A user enriched with denormalized names for API responses."""
+
+    user: UserEntity
+    project_name: str | None
+    department_name: str | None

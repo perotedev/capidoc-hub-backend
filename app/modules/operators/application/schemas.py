@@ -1,11 +1,11 @@
+from dataclasses import asdict
 from uuid import UUID
 
-from pydantic import BaseModel
-
 from app.modules.operators.domain.entities import OperatorReport
+from app.shared.schema import CamelCaseModel
 
 
-class OperatorStatsResponse(BaseModel):
+class OperatorStatsResponse(CamelCaseModel):
     today_attendances: int
     week_attendances: int
     month_attendances: int
@@ -14,7 +14,7 @@ class OperatorStatsResponse(BaseModel):
     completion_rate: int
 
 
-class OperatorResponse(BaseModel):
+class OperatorResponse(CamelCaseModel):
     id: UUID
     name: str
     email: str
@@ -36,5 +36,5 @@ class OperatorResponse(BaseModel):
             project_name=report.project_name,
             department_id=report.department_id,
             department_name=report.department_name,
-            stats=OperatorStatsResponse(**vars(report.stats)),
+            stats=OperatorStatsResponse(**asdict(report.stats)),
         )

@@ -1,27 +1,29 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from app.shared.schema import CamelCaseModel
 
 
-class GpsLocation(BaseModel):
+class GpsLocation(CamelCaseModel):
     latitude: float
     longitude: float
     accuracy: float
 
 
-class AttendanceResponse(BaseModel):
+class AttendanceResponse(CamelCaseModel):
     field_id: str
     field_label: str
     value: str | list[str]
 
 
-class AttendancePhoto(BaseModel):
+class AttendancePhoto(CamelCaseModel):
     id: str
     caption: str = ""
     file_key: str
 
 
-class AttendanceEntity(BaseModel):
+class AttendanceEntity(CamelCaseModel):
     """Domain representation of a submitted form response (an "attendance").
 
     Like forms, attendances are document-shaped — their `responses` mirror
@@ -46,7 +48,7 @@ class AttendanceEntity(BaseModel):
     synced_at: datetime | None = None
 
 
-class AttendanceStats(BaseModel):
+class AttendanceStats(CamelCaseModel):
     total: int
     today: int
     this_week: int

@@ -29,4 +29,5 @@ class PermissionGroupSummary:
     group: PermissionGroupEntity
     project_name: str
     members_count: int
+    member_ids: list[UUID]
     permissions: list[ResourcePermission]

@@ -1,13 +1,15 @@
+from dataclasses import asdict
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from app.modules.permissions.domain.entities import PermissionGroupSummary
 from app.shared.enums import Resource
+from app.shared.schema import CamelCaseModel
 
 
-class ResourcePermissionSchema(BaseModel):
+class ResourcePermissionSchema(CamelCaseModel):
     resource: Resource
     can_create: bool = False
     can_read: bool = False
@@ -15,36 +17,37 @@ class ResourcePermissionSchema(BaseModel):
     can_delete: bool = False
 
 
-class PermissionGroupCreateRequest(BaseModel):
+class PermissionGroupCreateRequest(CamelCaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str = ""
     project_id: UUID
 
 
-class PermissionGroupUpdateRequest(BaseModel):
+class PermissionGroupUpdateRequest(CamelCaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = None
 
 
-class SetGroupPermissionsRequest(BaseModel):
+class SetGroupPermissionsRequest(CamelCaseModel):
     permissions: list[ResourcePermissionSchema]
 
 
-class SetGroupMembersRequest(BaseModel):
+class SetGroupMembersRequest(CamelCaseModel):
     user_ids: list[UUID]
 
 
-class SetUserPermissionsRequest(BaseModel):
+class SetUserPermissionsRequest(CamelCaseModel):
     permissions: list[ResourcePermissionSchema]
 
 
-class PermissionGroupResponse(BaseModel):
+class PermissionGroupResponse(CamelCaseModel):
     id: UUID
     name: str
     description: str
     project_id: UUID
     project_name: str
     members_count: int
+    member_ids: list[UUID]
     permissions: list[ResourcePermissionSchema]
     created_at: datetime
     updated_at: datetime
@@ -58,7 +61,8 @@ class PermissionGroupResponse(BaseModel):
             project_id=summary.group.project_id,
             project_name=summary.project_name,
             members_count=summary.members_count,
-            permissions=[ResourcePermissionSchema(**vars(permission)) for permission in summary.permissions],
+            member_ids=summary.member_ids,
+            permissions=[ResourcePermissionSchema(**asdict(permission)) for permission in summary.permissions],
             created_at=summary.group.created_at,
             updated_at=summary.group.updated_at,
         )

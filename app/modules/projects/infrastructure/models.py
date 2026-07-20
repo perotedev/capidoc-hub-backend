@@ -15,10 +15,8 @@ class ProjectModel(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     cnpj: Mapped[str | None] = mapped_column(String(20), unique=True)
-    # `use_alter` breaks the projects <-> users circular FK cycle at DDL-creation time.
-    admin_id: Mapped[uuid.UUID | None] = mapped_column(
-        PgUUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="SET NULL", use_alter=True, name="fk_projects_admin_id"),
+    org_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
     )
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -9,6 +9,7 @@ from app.modules.documents.api.v1.endpoints import router as documents_router
 from app.modules.documents.api.v1.endpoints import templates_router as document_templates_router
 from app.modules.forms.api.v1.endpoints import router as forms_router
 from app.modules.operators.api.v1.endpoints import router as operators_router
+from app.modules.organizations.api.v1.endpoints import router as organizations_router
 from app.modules.permissions.api.v1.endpoints import router as permissions_router
 from app.modules.projects.api.v1.endpoints import router as projects_router
 from app.modules.reports.api.v1.endpoints import router as reports_router
@@ -17,6 +18,7 @@ from app.modules.validation.api.v1.endpoints import router as validation_router
 
 api_v1_router = APIRouter()
 api_v1_router.include_router(auth_router)
+api_v1_router.include_router(organizations_router)
 api_v1_router.include_router(users_router)
 api_v1_router.include_router(projects_router)
 api_v1_router.include_router(departments_router)

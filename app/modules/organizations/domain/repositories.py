@@ -1,0 +1,16 @@
+from typing import Protocol
+from uuid import UUID
+
+from app.modules.organizations.domain.entities import OrganizationEntity
+
+
+class OrganizationRepository(Protocol):
+    async def get_by_id(self, organization_id: UUID) -> OrganizationEntity | None: ...
+
+    async def get_by_admin_id(self, admin_id: UUID) -> OrganizationEntity | None: ...
+
+    async def list_all(self) -> list[OrganizationEntity]: ...
+
+    async def create(self, organization: OrganizationEntity) -> OrganizationEntity: ...
+
+    async def update(self, organization: OrganizationEntity) -> OrganizationEntity: ...

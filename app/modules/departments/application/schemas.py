@@ -1,26 +1,27 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from app.modules.departments.domain.entities import DepartmentSummary
+from app.shared.schema import CamelCaseModel
 
 
-class DepartmentCreateRequest(BaseModel):
+class DepartmentCreateRequest(CamelCaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str = ""
     project_id: UUID
     parent_id: UUID | None = None
 
 
-class DepartmentUpdateRequest(BaseModel):
+class DepartmentUpdateRequest(CamelCaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = None
     parent_id: UUID | None = None
     active: bool | None = None
 
 
-class DepartmentResponse(BaseModel):
+class DepartmentResponse(CamelCaseModel):
     id: UUID
     name: str
     description: str

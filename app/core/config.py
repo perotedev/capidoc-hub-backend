@@ -60,6 +60,12 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:4200"
     password_reset_token_expire_minutes: int = 30
 
+    # Dev seed — auto-creates this super admin on startup if no user with this
+    # email exists yet. Leave `default_admin_email` blank to disable.
+    default_admin_email: str = ""
+    default_admin_password: str = ""
+    default_admin_name: str = "Admin"
+
     @property
     def postgres_dsn(self) -> str:
         return (

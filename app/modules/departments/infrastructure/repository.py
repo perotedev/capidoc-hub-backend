@@ -60,8 +60,10 @@ class SqlAlchemyDepartmentRepository:
         statement = self._summary_statement().where(DepartmentModel.project_id == project_id)
         return await self._execute_summary(statement)
 
-    async def search(self, query: str | None) -> list[DepartmentSummary]:
+    async def search(self, query: str | None, project_ids: list[UUID] | None = None) -> list[DepartmentSummary]:
         statement = self._summary_statement()
+        if project_ids is not None:
+            statement = statement.where(DepartmentModel.project_id.in_(project_ids))
         if query:
             like_pattern = f"%{query}%"
             statement = statement.where(

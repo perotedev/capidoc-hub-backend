@@ -46,8 +46,10 @@ class PermissionService:
             raise NotFoundError(f"Permission group {group_id} not found")
         return summary
 
-    async def search_groups(self, query: str | None, project_id: UUID | None) -> list[PermissionGroupSummary]:
-        return await self._groups.search(query, project_id)
+    async def search_groups(
+        self, query: str | None, project_ids: list[UUID] | None = None
+    ) -> list[PermissionGroupSummary]:
+        return await self._groups.search(query, project_ids)
 
     async def create_group(self, request: PermissionGroupCreateRequest) -> PermissionGroupEntity:
         now = datetime.now(timezone.utc)
@@ -85,15 +87,73 @@ class PermissionService:
     async def get_user_permissions(self, user_id: UUID) -> list[ResourcePermission]:
         return await self._user_permissions.get_user_permissions(user_id)
 
+    async def get_effective_permissions(self, user_id: UUID) -> list[ResourcePermission]:
+        """Merges individual overrides with group-inherited permissions, OR-ing each
+        operation per resource — this is what actually gates a user's access, unlike
+        `get_user_permissions` which only returns their individual overrides.
+
+        Mirrors the role short-circuits in `has_permission`: SUPER_ADMIN has no
+        resource access at all (empty), ADMIN has full access to every resource,
+        AUDITOR has read-only access to every resource. Only USER is actually
+        governed by individual/group grants. Without this, the frontend's
+        self-lookup (`GET /permissions/me`, used to gate the sidebar and buttons)
+        would show ADMIN/AUDITOR as having no permissions at all, even though
+        `has_permission` grants them full/read access on every real request."""
+        user = await self._user_service.get_user(user_id)
+        if user.role == Role.SUPER_ADMIN:
+            return []
+        if user.role == Role.ADMIN:
+            return [
+                ResourcePermission(resource=resource, can_create=True, can_read=True, can_update=True, can_delete=True)
+                for resource in Resource
+            ]
+        if user.role == Role.AUDITOR:
+            return [
+                ResourcePermission(resource=resource, can_create=False, can_read=True, can_update=False, can_delete=False)
+                for resource in Resource
+            ]
+
+        individual = await self._user_permissions.get_user_permissions(user_id)
+        group_ids = await self._groups.get_group_ids_for_user(user_id)
+        group_permissions = await self._user_permissions.get_permissions_for_groups(group_ids)
+
+        merged: dict[Resource, ResourcePermission] = {}
+        for permission in [*individual, *group_permissions]:
+            existing = merged.get(permission.resource)
+            if existing is None:
+                merged[permission.resource] = ResourcePermission(
+                    resource=permission.resource,
+                    can_create=permission.can_create,
+                    can_read=permission.can_read,
+                    can_update=permission.can_update,
+                    can_delete=permission.can_delete,
+                )
+            else:
+                existing.can_create = existing.can_create or permission.can_create
+                existing.can_read = existing.can_read or permission.can_read
+                existing.can_update = existing.can_update or permission.can_update
+                existing.can_delete = existing.can_delete or permission.can_delete
+        return list(merged.values())
+
     async def set_user_permissions(self, user_id: UUID, permissions: list[ResourcePermissionSchema]) -> None:
         entries = [ResourcePermission(**permission.model_dump()) for permission in permissions]
         await self._user_permissions.set_user_permissions(user_id, entries)
 
     async def has_permission(self, user_id: UUID, resource: Resource, operation: PermissionOperation) -> bool:
-        """Super admins bypass everything; otherwise merges individual + group-inherited permissions."""
+        """SUPER_ADMIN has no tenant data access at all (not even read) — its
+        role is limited to Organization management, gated separately by
+        `require_roles`, not by this resource-permission system. ADMIN has
+        full, unrestricted access within its own organization. AUDITOR can
+        read anything in its organization but never create/update/delete,
+        regardless of any group/individual grant. USER is governed entirely
+        by individual + group-inherited permissions."""
         user = await self._user_service.get_user(user_id)
         if user.role == Role.SUPER_ADMIN:
+            return False
+        if user.role == Role.ADMIN:
             return True
+        if user.role == Role.AUDITOR:
+            return operation == PermissionOperation.READ
 
         field_name = _OPERATION_FIELD[operation]
 

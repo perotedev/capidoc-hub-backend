@@ -1,33 +1,32 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from app.modules.projects.domain.entities import ProjectSummary
+from app.shared.schema import CamelCaseModel
 
 
-class ProjectCreateRequest(BaseModel):
+class ProjectCreateRequest(CamelCaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str = ""
     cnpj: str | None = Field(default=None, max_length=20)
-    admin_id: UUID | None = None
 
 
-class ProjectUpdateRequest(BaseModel):
+class ProjectUpdateRequest(CamelCaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = None
     cnpj: str | None = None
-    admin_id: UUID | None = None
     active: bool | None = None
 
 
-class ProjectResponse(BaseModel):
+class ProjectResponse(CamelCaseModel):
     id: UUID
     name: str
     description: str
     cnpj: str | None
-    admin_id: UUID | None
-    admin_name: str | None
+    org_id: UUID
+    org_name: str
     users_count: int
     departments_count: int
     active: bool
@@ -41,8 +40,8 @@ class ProjectResponse(BaseModel):
             name=summary.project.name,
             description=summary.project.description,
             cnpj=summary.project.cnpj,
-            admin_id=summary.project.admin_id,
-            admin_name=summary.admin_name,
+            org_id=summary.project.org_id,
+            org_name=summary.org_name,
             users_count=summary.users_count,
             departments_count=summary.departments_count,
             active=summary.project.active,

@@ -5,7 +5,7 @@ from uuid import UUID
 from app.core.exceptions import ConflictError, NotFoundError
 from app.core.security import hash_password
 from app.modules.users.application.schemas import UserCreateRequest, UserUpdateRequest
-from app.modules.users.domain.entities import UserEntity
+from app.modules.users.domain.entities import UserEntity, UserSummary
 from app.modules.users.domain.repositories import UserRepository
 from app.shared.enums import Role
 
@@ -25,11 +25,24 @@ class UserService:
     async def get_by_email(self, email: str) -> UserEntity | None:
         return await self._repository.get_by_email(email)
 
-    async def list_users(self, project_id: UUID | None) -> list[UserEntity]:
-        return await self._repository.list_by_project(project_id)
+    async def get_user_summary(self, user_id: UUID) -> UserSummary:
+        summary = await self._repository.get_summary_by_id(user_id)
+        if summary is None:
+            raise NotFoundError(f"User {user_id} not found")
+        return summary
 
-    async def search_users(self, query: str | None, role: Role | None, project_id: UUID | None) -> list[UserEntity]:
-        return await self._repository.search(query, role, project_id)
+    async def list_users(self, project_ids: list[UUID] | None) -> list[UserEntity]:
+        return await self._repository.list_by_project(project_ids)
+
+    async def search_users(
+        self, query: str | None, role: Role | None, project_ids: list[UUID] | None
+    ) -> list[UserEntity]:
+        return await self._repository.search(query, role, project_ids)
+
+    async def search_users_summary(
+        self, query: str | None, role: Role | None, project_ids: list[UUID] | None
+    ) -> list[UserSummary]:
+        return await self._repository.search_summary(query, role, project_ids)
 
     async def create_user(self, request: UserCreateRequest) -> UserEntity:
         existing = await self._repository.get_by_email(request.email)

@@ -3,7 +3,9 @@ from uuid import UUID
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.users.domain.entities import UserEntity
+from app.modules.departments.infrastructure.models import DepartmentModel
+from app.modules.projects.infrastructure.models import ProjectModel
+from app.modules.users.domain.entities import UserEntity, UserSummary
 from app.modules.users.infrastructure.models import UserModel
 from app.shared.enums import Role
 
@@ -42,10 +44,47 @@ class SqlAlchemyUserRepository:
         model = result.scalar_one_or_none()
         return _to_entity(model) if model else None
 
-    async def list_by_project(self, project_id: UUID | None) -> list[UserEntity]:
+    def _summary_statement(self):
+        return (
+            select(UserModel, ProjectModel.name, DepartmentModel.name)
+            .outerjoin(ProjectModel, ProjectModel.id == UserModel.project_id)
+            .outerjoin(DepartmentModel, DepartmentModel.id == UserModel.department_id)
+        )
+
+    async def get_summary_by_id(self, user_id: UUID) -> UserSummary | None:
+        result = await self._session.execute(self._summary_statement().where(UserModel.id == user_id))
+        row = result.first()
+        if row is None:
+            return None
+        model, project_name, department_name = row
+        return UserSummary(user=_to_entity(model), project_name=project_name, department_name=department_name)
+
+    async def search_summary(
+        self,
+        query: str | None,
+        role: Role | None,
+        project_ids: list[UUID] | None,
+    ) -> list[UserSummary]:
+        statement = self._summary_statement()
+        if project_ids is not None:
+            statement = statement.where(UserModel.project_id.in_(project_ids))
+        if role is not None:
+            statement = statement.where(UserModel.role == role.value)
+        if query:
+            like_pattern = f"%{query}%"
+            statement = statement.where(
+                or_(UserModel.name.ilike(like_pattern), UserModel.email.ilike(like_pattern))
+            )
+        result = await self._session.execute(statement.order_by(UserModel.name))
+        return [
+            UserSummary(user=_to_entity(model), project_name=project_name, department_name=department_name)
+            for model, project_name, department_name in result.all()
+        ]
+
+    async def list_by_project(self, project_ids: list[UUID] | None) -> list[UserEntity]:
         statement = select(UserModel)
-        if project_id is not None:
-            statement = statement.where(UserModel.project_id == project_id)
+        if project_ids is not None:
+            statement = statement.where(UserModel.project_id.in_(project_ids))
         result = await self._session.execute(statement.order_by(UserModel.name))
         return [_to_entity(model) for model in result.scalars().all()]
 
@@ -53,11 +92,11 @@ class SqlAlchemyUserRepository:
         self,
         query: str | None,
         role: Role | None,
-        project_id: UUID | None,
+        project_ids: list[UUID] | None,
     ) -> list[UserEntity]:
         statement = select(UserModel)
-        if project_id is not None:
-            statement = statement.where(UserModel.project_id == project_id)
+        if project_ids is not None:
+            statement = statement.where(UserModel.project_id.in_(project_ids))
         if role is not None:
             statement = statement.where(UserModel.role == role.value)
         if query:

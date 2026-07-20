@@ -1,12 +1,13 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from app.modules.reports.domain.entities import ReportFormat, ReportStatus, ReportSummary, ReportType
+from app.shared.schema import CamelCaseModel
 
 
-class ReportFiltersRequest(BaseModel):
+class ReportFiltersRequest(CamelCaseModel):
     start_date: date | None = None
     end_date: date | None = None
     format: ReportFormat = ReportFormat.PDF
@@ -15,7 +16,7 @@ class ReportFiltersRequest(BaseModel):
     department_ids: list[UUID] = Field(default_factory=list)
 
 
-class ReportGenerateRequest(BaseModel):
+class ReportGenerateRequest(CamelCaseModel):
     name: str = Field(min_length=1, max_length=200)
     type: ReportType
     description: str = ""
@@ -23,7 +24,7 @@ class ReportGenerateRequest(BaseModel):
     filters: ReportFiltersRequest
 
 
-class ReportFiltersResponse(BaseModel):
+class ReportFiltersResponse(CamelCaseModel):
     start_date: date | None
     end_date: date | None
     format: ReportFormat
@@ -32,7 +33,7 @@ class ReportFiltersResponse(BaseModel):
     department_ids: list[UUID]
 
 
-class ReportResponse(BaseModel):
+class ReportResponse(CamelCaseModel):
     id: UUID
     name: str
     type: ReportType

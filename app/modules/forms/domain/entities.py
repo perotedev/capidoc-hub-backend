@@ -1,7 +1,9 @@
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from app.shared.schema import CamelCaseModel
 
 
 class FieldType(StrEnum):
@@ -27,13 +29,13 @@ class FormStatus(StrEnum):
     ARCHIVED = "ARCHIVED"
 
 
-class FormFieldOption(BaseModel):
+class FormFieldOption(CamelCaseModel):
     id: str
     label: str
     value: str
 
 
-class FormFieldValidation(BaseModel):
+class FormFieldValidation(CamelCaseModel):
     min_length: int | None = None
     max_length: int | None = None
     min: float | None = None
@@ -43,14 +45,14 @@ class FormFieldValidation(BaseModel):
     require_gps: bool | None = None
 
 
-class ConditionalLogic(BaseModel):
+class ConditionalLogic(CamelCaseModel):
     field_id: str
     operator: str
     value: str
     action: str
 
 
-class FormField(BaseModel):
+class FormField(CamelCaseModel):
     id: str
     type: FieldType
     label: str = ""
@@ -63,7 +65,7 @@ class FormField(BaseModel):
     chart_type: str | None = None
 
 
-class FormSettings(BaseModel):
+class FormSettings(CamelCaseModel):
     allow_photos: bool = True
     require_gps: bool = False
     require_signature: bool = False
@@ -71,33 +73,33 @@ class FormSettings(BaseModel):
     max_response_time: int | None = None
 
 
-class TemplateConditionalRule(BaseModel):
+class TemplateConditionalRule(CamelCaseModel):
     id: str
     operator: str
     value: str
     text: str
 
 
-class TemplateBoxBounds(BaseModel):
+class TemplateBoxBounds(CamelCaseModel):
     x: float
     y: float
     width: float
     height: float
 
 
-class TemplateBoxAlignment(BaseModel):
+class TemplateBoxAlignment(CamelCaseModel):
     horizontal: str = "left"
     vertical: str = "middle"
 
 
-class TemplateBoxPadding(BaseModel):
+class TemplateBoxPadding(CamelCaseModel):
     top: float = 0
     right: float = 2
     bottom: float = 0
     left: float = 2
 
 
-class TemplateBoxTextOptions(BaseModel):
+class TemplateBoxTextOptions(CamelCaseModel):
     word_wrap: bool = False
     overflow_behavior: str = "truncate"
     line_spacing: float = 1.2
@@ -105,7 +107,7 @@ class TemplateBoxTextOptions(BaseModel):
     uppercase: bool = False
 
 
-class TemplateBoxStyle(BaseModel):
+class TemplateBoxStyle(CamelCaseModel):
     font_family: str = "Arial"
     font_size: int = 10
     bold: bool = False
@@ -114,7 +116,7 @@ class TemplateBoxStyle(BaseModel):
     color: str = "#000000"
 
 
-class TemplateBox(BaseModel):
+class TemplateBox(CamelCaseModel):
     """Per-form PDF field layout.
 
     Schema mirrors the capidoc-tauri desktop app's `TextBox`/`DocumentProfile`
@@ -134,7 +136,7 @@ class TemplateBox(BaseModel):
     conditional_rules: list[TemplateConditionalRule] = Field(default_factory=list)
 
 
-class FormEntity(BaseModel):
+class FormEntity(CamelCaseModel):
     """Domain representation of a dynamic form, persisted as-is in MongoDB.
 
     Forms are inherently document-shaped (their `fields` are user-defined at

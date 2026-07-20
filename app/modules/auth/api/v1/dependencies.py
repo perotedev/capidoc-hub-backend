@@ -13,10 +13,11 @@ from app.modules.auth.application.services import AuthService
 from app.modules.auth.domain.repositories import PasswordResetRepository, SessionRepository
 from app.modules.auth.infrastructure.password_reset_repository import RedisPasswordResetRepository
 from app.modules.auth.infrastructure.session_repository import RedisSessionRepository
+from app.modules.permissions.api.v1.dependencies import PermissionServiceDep
 from app.modules.users.api.v1.dependencies import UserServiceDep
 from app.modules.users.application.services import UserService
 from app.modules.users.domain.entities import UserEntity
-from app.shared.enums import Role
+from app.shared.enums import PermissionOperation, Resource, Role
 
 _oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=True)
 
@@ -67,10 +68,27 @@ CurrentUser = Annotated[UserEntity, Depends(get_current_user)]
 
 
 def require_roles(*allowed_roles: Role):
-    """Dependency factory that only lets requests through if the user's role is in `allowed_roles`."""
+    """Dependency factory that only lets requests through if the user's role is
+    in `allowed_roles`. No role bypasses this — SUPER_ADMIN included: it must
+    be listed explicitly wherever it should be let through."""
 
     def _check(current_user: CurrentUser) -> UserEntity:
-        if current_user.role not in allowed_roles and not current_user.is_super_admin():
+        if current_user.role not in allowed_roles:
+            raise ForbiddenError("You do not have permission to perform this action")
+        return current_user
+
+    return Depends(_check)
+
+
+def require_permission(resource: Resource, operation: PermissionOperation):
+    """Dependency factory gating an endpoint on the Permissions module's merged
+    (individual + group) grant for `resource`/`operation` — see
+    `PermissionService.has_permission` for the per-role semantics (SUPER_ADMIN
+    always denied, ADMIN always allowed, AUDITOR read-only, USER by grant)."""
+
+    async def _check(current_user: CurrentUser, permission_service: PermissionServiceDep) -> UserEntity:
+        allowed = await permission_service.has_permission(current_user.id, resource, operation)
+        if not allowed:
             raise ForbiddenError("You do not have permission to perform this action")
         return current_user
 

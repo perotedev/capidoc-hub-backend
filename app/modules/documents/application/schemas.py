@@ -1,12 +1,11 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
-
 from app.modules.documents.domain.entities import DocStatus
+from app.shared.schema import CamelCaseModel
 
 
-class DocumentTemplateCreateRequest(BaseModel):
+class DocumentTemplateCreateRequest(CamelCaseModel):
     name: str
     description: str = ""
     project_id: UUID
@@ -14,7 +13,7 @@ class DocumentTemplateCreateRequest(BaseModel):
     footer_text: str = ""
 
 
-class DocumentTemplateUpdateRequest(BaseModel):
+class DocumentTemplateUpdateRequest(CamelCaseModel):
     name: str | None = None
     description: str | None = None
     header_logo_key: str | None = None
@@ -22,7 +21,7 @@ class DocumentTemplateUpdateRequest(BaseModel):
     active: bool | None = None
 
 
-class DocumentTemplateResponse(BaseModel):
+class DocumentTemplateResponse(CamelCaseModel):
     id: UUID
     name: str
     description: str
@@ -34,7 +33,7 @@ class DocumentTemplateResponse(BaseModel):
     updated_at: datetime
 
 
-class DocumentGenerateRequest(BaseModel):
+class DocumentGenerateRequest(CamelCaseModel):
     """Registers a document for an already-completed attendance.
 
     The PDF itself is rendered outside this service (frontend or a dedicated
@@ -46,11 +45,11 @@ class DocumentGenerateRequest(BaseModel):
     template_id: UUID | None = None
 
 
-class DocumentRevokeRequest(BaseModel):
+class DocumentRevokeRequest(CamelCaseModel):
     reason: str
 
 
-class DocumentResponse(BaseModel):
+class DocumentResponse(CamelCaseModel):
     """API response for a document — like `DocumentEntity`, but with the PDF's
     S3 key resolved to a temporary signed URL (cached in Redis) when available."""
 
@@ -74,7 +73,7 @@ class DocumentResponse(BaseModel):
     updated_at: datetime
 
 
-class DocumentValidationResponse(BaseModel):
+class DocumentValidationResponse(CamelCaseModel):
     """Public-facing response for the no-auth validation-code lookup — deliberately
     excludes internal identifiers, exposing only what a third party should see."""
 

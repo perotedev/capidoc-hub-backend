@@ -73,7 +73,9 @@ class AuthService:
 
     async def change_password(self, user_id: UUID, current_password: str, new_password: str) -> None:
         user = await self._user_service.get_user(user_id)
-        if not verify_password(current_password, user.password_hash):
+        # A first-access user has no real password to confirm yet — they're only
+        # here because they just authenticated with the temporary one.
+        if not user.first_access and not verify_password(current_password, user.password_hash):
             raise UnauthorizedError("Current password is incorrect")
         await self._user_service.change_password(user_id, new_password)
         await self._session_repository.delete_all_sessions(user_id)

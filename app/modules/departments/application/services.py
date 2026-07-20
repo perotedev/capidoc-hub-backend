@@ -27,8 +27,8 @@ class DepartmentService:
     async def list_by_project(self, project_id: UUID) -> list[DepartmentSummary]:
         return await self._repository.list_by_project(project_id)
 
-    async def search(self, query: str | None) -> list[DepartmentSummary]:
-        return await self._repository.search(query)
+    async def search(self, query: str | None, project_ids: list[UUID] | None = None) -> list[DepartmentSummary]:
+        return await self._repository.search(query, project_ids)
 
     async def create_department(self, request: DepartmentCreateRequest) -> DepartmentEntity:
         now = datetime.now(timezone.utc)

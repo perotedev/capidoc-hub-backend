@@ -1,3 +1,4 @@
+from dataclasses import asdict
 from uuid import UUID
 
 from sqlalchemy import or_, select
@@ -133,7 +134,7 @@ class SqlAlchemyDashboardCustomRepository:
                 id=widget.id,
                 type=widget.type.value,
                 title=widget.title,
-                config=vars(widget.config),
+                config=asdict(widget.config),
                 position_x=widget.position.x,
                 position_y=widget.position.y,
                 position_cols=widget.position.cols,
