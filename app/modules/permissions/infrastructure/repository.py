@@ -1,3 +1,4 @@
+from collections import defaultdict
 from uuid import UUID
 
 from sqlalchemy import delete, select
@@ -87,7 +88,39 @@ class SqlAlchemyPermissionRepository:
                 | PermissionGroupModel.description.ilike(like_pattern)
             )
         result = await self._session.execute(statement.order_by(PermissionGroupModel.name))
-        return [await self._build_summary(model, project_name) for model, project_name in result.all()]
+        rows = result.all()
+        if not rows:
+            return []
+
+        # Batch-fetch members + permissions for every matched group instead of
+        # the 2-queries-per-group `_build_summary` would otherwise issue.
+        group_ids = [model.id for model, _ in rows]
+
+        members_result = await self._session.execute(
+            select(PermissionGroupMemberModel.group_id, PermissionGroupMemberModel.user_id)
+            .where(PermissionGroupMemberModel.group_id.in_(group_ids))
+        )
+        member_ids_by_group: dict[UUID, list[UUID]] = defaultdict(list)
+        for group_id, user_id in members_result.all():
+            member_ids_by_group[group_id].append(user_id)
+
+        permissions_result = await self._session.execute(
+            select(GroupPermissionModel).where(GroupPermissionModel.group_id.in_(group_ids))
+        )
+        permissions_by_group: dict[UUID, list[ResourcePermission]] = defaultdict(list)
+        for model in permissions_result.scalars().all():
+            permissions_by_group[model.group_id].append(_permission_to_entity(model))
+
+        return [
+            PermissionGroupSummary(
+                group=_group_to_entity(model),
+                project_name=project_name,
+                members_count=len(member_ids_by_group.get(model.id, [])),
+                member_ids=member_ids_by_group.get(model.id, []),
+                permissions=permissions_by_group.get(model.id, []),
+            )
+            for model, project_name in rows
+        ]
 
     async def create(self, group: PermissionGroupEntity) -> PermissionGroupEntity:
         model = PermissionGroupModel(

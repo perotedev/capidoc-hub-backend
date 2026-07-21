@@ -62,8 +62,8 @@ class AttendanceService:
     ) -> list[AttendanceEntity]:
         return await self._repository.search_by_form(form_id, query, start_date, end_date, field_id, field_value)
 
-    async def get_stats(self, project_id: str | None) -> AttendanceStatsResponse:
-        stats = await self._repository.get_stats(project_id)
+    async def get_stats(self, project_id: str | None, project_ids: list[str] | None = None) -> AttendanceStatsResponse:
+        stats = await self._repository.get_stats(project_id, project_ids)
         return AttendanceStatsResponse(**stats.model_dump())
 
     async def create_attendance(self, attendance: AttendanceEntity) -> AttendanceEntity:

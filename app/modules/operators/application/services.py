@@ -64,31 +64,28 @@ class OperatorService:
         self._location_ping_repository = location_ping_repository
         self._file_url_cache = file_url_cache
 
-    async def _today_completion_rate(self, operator_id: UUID, project_id: UUID | None, today_start: datetime) -> int:
+    @staticmethod
+    def _completion_rate(mine: list[AttendanceEntity], available_forms: list, today_start: datetime) -> int:
         """% of the operator's assigned forms filled at least once today.
 
         "Assigned" is approximated as every PUBLISHED form in the operator's
         project (the domain has no per-operator form assignment yet). A day
         with no available forms counts as fully complete (nothing was owed).
         """
-        if project_id is None:
-            return 100
-
-        available_forms = await self._form_repository.search(None, FormStatus.PUBLISHED, str(project_id))
         if not available_forms:
             return 100
-
-        attendances = await self._attendance_repository.search(query=None, form_id=None)
-        forms_filled_today = {
-            a.form_id
-            for a in attendances
-            if a.operator_id == str(operator_id) and a.created_at >= today_start
-        }
+        forms_filled_today = {a.form_id for a in mine if a.created_at >= today_start}
         available_form_ids = {form.id for form in available_forms}
         return round(len(forms_filled_today & available_form_ids) / len(available_form_ids) * 100)
 
-    async def _build_stats(self, operator_id: UUID, project_id: UUID | None) -> OperatorStats:
-        attendances = await self._attendance_repository.search(query=None, form_id=None)
+    @staticmethod
+    def _compute_stats(
+        operator_id: UUID, attendances: list[AttendanceEntity], available_forms: list
+    ) -> OperatorStats:
+        """Pure aggregation over an already-fetched attendance/form set — takes
+        no repository dependency so it can be reused for both a single operator
+        (`get_operator`) and a whole page of them (`list_operators`) without
+        re-querying per operator."""
         mine = [a for a in attendances if a.operator_id == str(operator_id)]
 
         now = datetime.now(timezone.utc)
@@ -100,8 +97,8 @@ class OperatorService:
         week_count = sum(1 for a in mine if a.created_at >= week_start)
         month_count = sum(1 for a in mine if a.created_at >= month_start)
         avg_duration = int(sum(a.duration for a in mine) / len(mine)) if mine else 0
-        completion_rate = await self._today_completion_rate(operator_id, project_id, today_start)
-        by_day = self._build_by_day(mine, today_start)
+        completion_rate = OperatorService._completion_rate(mine, available_forms, today_start)
+        by_day = OperatorService._build_by_day(mine, today_start)
 
         return OperatorStats(
             today_attendances=today_count,
@@ -144,7 +141,13 @@ class OperatorService:
             department = await self._department_repository.get_by_id(user.department_id)
             department_name = department.name if department else None
 
-        stats = await self._build_stats(user.id, user.project_id)
+        attendances = await self._attendance_repository.search(query=None, form_id=None)
+        available_forms = (
+            await self._form_repository.search(None, FormStatus.PUBLISHED, str(user.project_id))
+            if user.project_id is not None else []
+        )
+        stats = self._compute_stats(user.id, attendances, available_forms)
+
         return OperatorReport(
             id=user.id,
             name=user.name,
@@ -158,8 +161,52 @@ class OperatorService:
         )
 
     async def list_operators(self, project_ids: list[UUID] | None) -> list[OperatorReport]:
+        """Builds every operator's report from a handful of batched fetches
+        instead of the N-times-over repository calls a naive per-operator loop
+        would make — attendances, project/department names, and published
+        forms are each fetched once (or once per distinct project), not once
+        per operator."""
         users = await self._user_service.search_users(query=None, role=Role.USER, project_ids=project_ids)
-        return [await self.get_operator(user.id) for user in users]
+        if not users:
+            return []
+
+        attendances = await self._attendance_repository.search(query=None, form_id=None)
+
+        distinct_project_ids = {user.project_id for user in users if user.project_id is not None}
+        distinct_department_ids = {user.department_id for user in users if user.department_id is not None}
+
+        project_names_by_id: dict[UUID, str] = {}
+        for project_id in distinct_project_ids:
+            project = await self._project_repository.get_by_id(project_id)
+            if project:
+                project_names_by_id[project_id] = project.name
+
+        department_names_by_id: dict[UUID, str] = {}
+        for department_id in distinct_department_ids:
+            department = await self._department_repository.get_by_id(department_id)
+            if department:
+                department_names_by_id[department_id] = department.name
+
+        forms_by_project_id: dict[UUID, list] = {}
+        for project_id in distinct_project_ids:
+            forms_by_project_id[project_id] = await self._form_repository.search(None, FormStatus.PUBLISHED, str(project_id))
+
+        return [
+            OperatorReport(
+                id=user.id,
+                name=user.name,
+                email=user.email,
+                avatar_url=user.avatar_url,
+                project_id=user.project_id,
+                project_name=project_names_by_id.get(user.project_id) if user.project_id else None,
+                department_id=user.department_id,
+                department_name=department_names_by_id.get(user.department_id) if user.department_id else None,
+                stats=self._compute_stats(
+                    user.id, attendances, forms_by_project_id.get(user.project_id, []) if user.project_id else []
+                ),
+            )
+            for user in users
+        ]
 
     async def get_day_detail(self, operator_id: UUID, date: str) -> OperatorDayDetailResponse:
         """Builds the operator's day timeline from three real sources: the

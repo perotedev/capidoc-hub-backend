@@ -61,20 +61,36 @@ class RedisSessionRepository:
 
     async def delete_all_sessions(self, user_id: UUID) -> None:
         session_ids = await self._redis.smembers(self._user_sessions_key(user_id))
-        for session_id in session_ids:
-            await self._redis.delete(self._session_key(user_id, session_id))
+        if session_ids:
+            pipeline = self._redis.pipeline()
+            for session_id in session_ids:
+                pipeline.delete(self._session_key(user_id, session_id))
+            await pipeline.execute()
         await self._redis.delete(self._user_sessions_key(user_id))
 
     async def list_sessions(self, user_id: UUID) -> list[UserSession]:
-        session_ids = await self._redis.smembers(self._user_sessions_key(user_id))
+        session_ids = list(await self._redis.smembers(self._user_sessions_key(user_id)))
+        if not session_ids:
+            return []
+
+        pipeline = self._redis.pipeline()
+        for session_id in session_ids:
+            pipeline.hgetall(self._session_key(user_id, session_id))
+        results = await pipeline.execute()
+
         sessions: list[UserSession] = []
         stale_ids: list[str] = []
-        for session_id in session_ids:
-            session = await self.get_session(user_id, session_id)
-            if session is None:
+        for session_id, data in zip(session_ids, results):
+            if not data:
                 stale_ids.append(session_id)
-            else:
-                sessions.append(session)
+                continue
+            sessions.append(UserSession(
+                user_id=user_id,
+                session_id=session_id,
+                user_agent=data.get("user_agent") or None,
+                created_at=datetime.fromisoformat(data["created_at"]),
+                expires_at=datetime.fromisoformat(data["expires_at"]),
+            ))
         if stale_ids:
             await self._redis.srem(self._user_sessions_key(user_id), *stale_ids)
         return sessions

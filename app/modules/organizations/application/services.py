@@ -29,19 +29,26 @@ class OrganizationService:
         self._form_repository = form_repository
         self._attendance_repository = attendance_repository
 
-    async def _build_summary(self, organization: OrganizationEntity) -> OrganizationSummary:
+    async def _build_summary(
+        self,
+        organization: OrganizationEntity,
+        all_forms: list | None = None,
+        all_attendances: list | None = None,
+    ) -> OrganizationSummary:
         admin = await self._user_service.get_user(organization.admin_id)
         project_ids = await self._repository.get_project_ids(organization.id)
         project_id_strings = {str(project_id) for project_id in project_ids}
 
         forms_count = 0
         attendances_count = 0
-        if project_ids:
-            all_forms = await self._form_repository.search(None, None, None)
-            forms_count = sum(1 for form in all_forms if form.project_id in project_id_strings)
+        if project_id_strings:
+            forms = all_forms if all_forms is not None else await self._form_repository.search(None, None, None)
+            forms_count = sum(1 for form in forms if form.project_id in project_id_strings)
 
-            all_attendances = await self._attendance_repository.search(None, None)
-            attendances_count = sum(1 for attendance in all_attendances if attendance.project_id in project_id_strings)
+            attendances = (
+                all_attendances if all_attendances is not None else await self._attendance_repository.search(None, None)
+            )
+            attendances_count = sum(1 for attendance in attendances if attendance.project_id in project_id_strings)
 
         return OrganizationSummary(
             organization=organization,
@@ -60,8 +67,18 @@ class OrganizationService:
         return await self._build_summary(organization)
 
     async def list_organizations(self) -> list[OrganizationSummary]:
+        """Fetches every form/attendance once (not per organization) since
+        `_build_summary` would otherwise re-scan both collections in full for
+        every organization in the list."""
         organizations = await self._repository.list_all()
-        return [await self._build_summary(organization) for organization in organizations]
+        if not organizations:
+            return []
+        all_forms = await self._form_repository.search(None, None, None)
+        all_attendances = await self._attendance_repository.search(None, None)
+        return [
+            await self._build_summary(organization, all_forms, all_attendances)
+            for organization in organizations
+        ]
 
     async def create_organization(self, request: OrganizationCreateRequest) -> OrganizationSummary:
         existing_admin = await self._user_service.get_by_email(request.admin_email)

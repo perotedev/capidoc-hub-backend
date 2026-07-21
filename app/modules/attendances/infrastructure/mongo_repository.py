@@ -70,9 +70,11 @@ class MongoAttendanceRepository:
         documents = await cursor.to_list(length=None)
         return [_to_entity(document) for document in documents]
 
-    async def get_stats(self, project_id: str | None) -> AttendanceStats:
+    async def get_stats(self, project_id: str | None, project_ids: list[str] | None = None) -> AttendanceStats:
         mongo_filter: dict = {}
-        if project_id:
+        if project_ids is not None:
+            mongo_filter["project_id"] = {"$in": project_ids}
+        elif project_id:
             mongo_filter["project_id"] = project_id
 
         cursor = self._collection.find(mongo_filter)
