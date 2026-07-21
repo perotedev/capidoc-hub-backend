@@ -100,8 +100,12 @@ class SqlAlchemyDeviceRepository:
             assigned_to_name=assigned_to_name,
         )
 
-    async def search(self, query: str | None, status: DeviceStatus | None) -> list[DeviceSummary]:
+    async def search(
+        self, query: str | None, status: DeviceStatus | None, project_ids: list[UUID] | None = None
+    ) -> list[DeviceSummary]:
         statement = self._summary_statement()
+        if project_ids is not None:
+            statement = statement.where(DeviceModel.project_id.in_(project_ids))
         if status is not None:
             statement = statement.where(DeviceModel.status == status.value)
         if query:

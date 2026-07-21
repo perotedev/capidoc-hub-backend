@@ -68,8 +68,10 @@ class DeviceService:
             downloads=[_download_to_response(download) for download in downloads],
         )
 
-    async def search(self, query: str | None, status: DeviceStatus | None) -> list[DeviceResponse]:
-        summaries = await self._repository.search(query, status)
+    async def search(
+        self, query: str | None, status: DeviceStatus | None, project_ids: list[UUID] | None = None
+    ) -> list[DeviceResponse]:
+        summaries = await self._repository.search(query, status, project_ids)
         return [DeviceResponse.from_summary(summary) for summary in summaries]
 
     async def register_device(self, request: DeviceRegisterRequest) -> DeviceResponse:

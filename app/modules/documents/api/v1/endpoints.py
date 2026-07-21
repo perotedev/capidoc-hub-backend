@@ -4,7 +4,7 @@ from fastapi import APIRouter, File, Query, UploadFile
 
 from app.modules.activities.api.v1.dependencies import ActivityServiceDep
 from app.modules.activities.domain.entities import ActivityType
-from app.modules.auth.api.v1.dependencies import CurrentUser
+from app.modules.auth.api.v1.dependencies import CurrentUser, require_permission
 from app.modules.documents.api.v1.dependencies import DocumentServiceDep, DocumentTemplateServiceDep
 from app.modules.documents.application.schemas import (
     DocumentGenerateRequest,
@@ -15,12 +15,13 @@ from app.modules.documents.application.schemas import (
     DocumentTemplateUpdateRequest,
 )
 from app.modules.documents.domain.entities import DocStatus
+from app.shared.enums import PermissionOperation, Resource
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 templates_router = APIRouter(prefix="/document-templates", tags=["Document Templates"])
 
 
-@router.get("", response_model=list[DocumentResponse])
+@router.get("", response_model=list[DocumentResponse], dependencies=[require_permission(Resource.DOCUMENTO, PermissionOperation.READ)])
 async def search_documents(
     _current_user: CurrentUser,
     service: DocumentServiceDep,
@@ -31,19 +32,19 @@ async def search_documents(
     return await service.search(query, status, project_id)
 
 
-@router.get("/by-attendance/{attendance_id}", response_model=DocumentResponse)
+@router.get("/by-attendance/{attendance_id}", response_model=DocumentResponse, dependencies=[require_permission(Resource.DOCUMENTO, PermissionOperation.READ)])
 async def get_document_by_attendance(
     attendance_id: str, _current_user: CurrentUser, service: DocumentServiceDep
 ) -> DocumentResponse:
     return await service.get_by_attendance(attendance_id)
 
 
-@router.get("/{document_id}", response_model=DocumentResponse)
+@router.get("/{document_id}", response_model=DocumentResponse, dependencies=[require_permission(Resource.DOCUMENTO, PermissionOperation.READ)])
 async def get_document(document_id: UUID, _current_user: CurrentUser, service: DocumentServiceDep) -> DocumentResponse:
     return await service.get_document(document_id)
 
 
-@router.post("", response_model=DocumentResponse, status_code=201)
+@router.post("", response_model=DocumentResponse, status_code=201, dependencies=[require_permission(Resource.DOCUMENTO, PermissionOperation.CREATE)])
 async def register_document(
     request: DocumentGenerateRequest, current_user: CurrentUser, service: DocumentServiceDep, activity_service: ActivityServiceDep
 ) -> DocumentResponse:
@@ -61,7 +62,7 @@ async def register_document(
     return document
 
 
-@router.post("/{document_id}/pdf", response_model=DocumentResponse)
+@router.post("/{document_id}/pdf", response_model=DocumentResponse, dependencies=[require_permission(Resource.DOCUMENTO, PermissionOperation.CREATE)])
 async def upload_document_pdf(
     document_id: UUID,
     current_user: CurrentUser,
@@ -83,7 +84,7 @@ async def upload_document_pdf(
     return document
 
 
-@router.post("/{document_id}/revoke", response_model=DocumentResponse)
+@router.post("/{document_id}/revoke", response_model=DocumentResponse, dependencies=[require_permission(Resource.DOCUMENTO, PermissionOperation.UPDATE)])
 async def revoke_document(
     document_id: UUID,
     request: DocumentRevokeRequest,
@@ -93,28 +94,28 @@ async def revoke_document(
     return await service.revoke_document(document_id, current_user.id, request.reason)
 
 
-@templates_router.get("/project/{project_id}", response_model=list[DocumentTemplateResponse])
+@templates_router.get("/project/{project_id}", response_model=list[DocumentTemplateResponse], dependencies=[require_permission(Resource.DOCUMENTO, PermissionOperation.READ)])
 async def list_templates(
     project_id: UUID, _current_user: CurrentUser, service: DocumentTemplateServiceDep
 ) -> list[DocumentTemplateResponse]:
     return await service.list_by_project(project_id)
 
 
-@templates_router.get("/{template_id}", response_model=DocumentTemplateResponse)
+@templates_router.get("/{template_id}", response_model=DocumentTemplateResponse, dependencies=[require_permission(Resource.DOCUMENTO, PermissionOperation.READ)])
 async def get_template(
     template_id: UUID, _current_user: CurrentUser, service: DocumentTemplateServiceDep
 ) -> DocumentTemplateResponse:
     return await service.get_template(template_id)
 
 
-@templates_router.post("", response_model=DocumentTemplateResponse, status_code=201)
+@templates_router.post("", response_model=DocumentTemplateResponse, status_code=201, dependencies=[require_permission(Resource.DOCUMENTO, PermissionOperation.CREATE)])
 async def create_template(
     request: DocumentTemplateCreateRequest, _current_user: CurrentUser, service: DocumentTemplateServiceDep
 ) -> DocumentTemplateResponse:
     return await service.create_template(request)
 
 
-@templates_router.patch("/{template_id}", response_model=DocumentTemplateResponse)
+@templates_router.patch("/{template_id}", response_model=DocumentTemplateResponse, dependencies=[require_permission(Resource.DOCUMENTO, PermissionOperation.UPDATE)])
 async def update_template(
     template_id: UUID,
     request: DocumentTemplateUpdateRequest,
@@ -124,7 +125,7 @@ async def update_template(
     return await service.update_template(template_id, request)
 
 
-@templates_router.delete("/{template_id}", status_code=204)
+@templates_router.delete("/{template_id}", status_code=204, dependencies=[require_permission(Resource.DOCUMENTO, PermissionOperation.DELETE)])
 async def delete_template(
     template_id: UUID, _current_user: CurrentUser, service: DocumentTemplateServiceDep
 ) -> None:

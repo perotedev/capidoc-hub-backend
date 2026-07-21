@@ -5,7 +5,7 @@ from app.modules.attendances.api.v1.dependencies import AttendanceServiceDep
 from app.modules.attendances.application.schemas import AttendanceDetailResponse, AttendanceStatsResponse
 from app.modules.attendances.domain.entities import AttendanceEntity
 from app.modules.auth.api.v1.dependencies import CurrentUser, require_permission
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import ForbiddenError, NotFoundError
 from app.shared.enums import PermissionOperation, Resource
 
 router = APIRouter(prefix="/attendances", tags=["Attendances"])
@@ -18,8 +18,11 @@ async def search_attendances(
     service: AttendanceServiceDep,
     query: str | None = Query(default=None),
     form_id: str | None = Query(default=None),
+    project_id: str | None = Query(default=None),
 ) -> list[AttendanceEntity]:
-    allowed = {str(pid) for pid in org_project_ids}
+    if project_id is not None and project_id not in {str(pid) for pid in org_project_ids}:
+        raise ForbiddenError("That project does not belong to your organization")
+    allowed = {project_id} if project_id is not None else {str(pid) for pid in org_project_ids}
     attendances = await service.search(query, form_id)
     return [attendance for attendance in attendances if attendance.project_id in allowed]
 
