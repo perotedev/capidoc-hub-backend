@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from uuid import UUID
 
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import BusinessRuleError, NotFoundError
 from app.modules.departments.application.schemas import DepartmentCreateRequest, DepartmentUpdateRequest
 from app.modules.departments.domain.entities import DepartmentEntity, DepartmentSummary
 from app.modules.departments.domain.repositories import DepartmentRepository
@@ -50,7 +50,9 @@ class DepartmentService:
             department.name = request.name
         if request.description is not None:
             department.description = request.description
-        if request.parent_id is not None:
+        if "parent_id" in request.model_fields_set:
+            if request.parent_id == department_id:
+                raise BusinessRuleError("A department cannot be its own parent")
             department.parent_id = request.parent_id
         if request.active is not None:
             department.active = request.active

@@ -96,7 +96,7 @@ class UserService:
             user.role = request.role
         if request.project_id is not None:
             user.project_id = request.project_id
-        if request.department_id is not None:
+        if "department_id" in request.model_fields_set:
             user.department_id = request.department_id
         if request.avatar_url is not None:
             user.avatar_url = request.avatar_url

@@ -10,6 +10,7 @@ services:
       - ./alembic:/app/alembic
       - ./tests:/app/tests
       - ./pytest.ini:/app/pytest.ini
+      - ./requirements-dev.txt:/app/requirements-dev.txt
     depends_on:
       postgres:
         condition: service_healthy
